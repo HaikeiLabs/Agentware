@@ -1,7 +1,6 @@
-version: "2"
-
 run:
   timeout: 5m
+  modules-download-mode: readonly
 
 linters:
   enable:
@@ -9,8 +8,15 @@ linters:
     - staticcheck
     - unused
     - errcheck
+  disable:
+    - revive
+    - stylecheck
 
 issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
