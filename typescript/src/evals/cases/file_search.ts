@@ -1,4 +1,4 @@
-import { EvalCase, ToolDefinition } from "../runner";
+import { EvalCase, ToolDefinition } from "../runner.js";
 
 export const FileSearchTools: ToolDefinition[] = [
   {

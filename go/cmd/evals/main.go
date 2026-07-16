@@ -105,8 +105,8 @@ func main() {
 	fileSearch := flag.Bool("file-search", false, "Run file search evals only")
 	general := flag.Bool("general", false, "Run general tool calling evals only")
 	_ = flag.Bool("all", true, "Run all evals (default)")
-	models := flag.String("models", "nemotron-3-super-120b", "Comma-separated model list")
-	baseURL := flag.String("base-url", "http://pedrogpt:8080/v1", "API base URL")
+	models := flag.String("models", "qwen3.6-27b-mtp", "Comma-separated model list")
+	baseURL := flag.String("base-url", "http://pedrogpt:8000", "API base URL")
 	maxTurns := flag.Int("max-turns", 10, "Max turns per eval")
 	flag.Parse()
 
