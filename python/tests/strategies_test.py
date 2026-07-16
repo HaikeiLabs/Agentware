@@ -1,6 +1,5 @@
 """Tests for TieredCompact compaction strategy."""
 
-import pytest
 from pedro_agentware.llm import Message, Role
 from pedro_agentware.llmcontext.strategies import TieredCompact, _find_eligible_end
 from pedro_agentware.middleware.types import MessageMeta, MessageType

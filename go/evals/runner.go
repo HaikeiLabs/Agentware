@@ -111,7 +111,7 @@ func (r *EvalRunner) RunCase(case_ EvalCase, model string, toolExecutor ToolExec
 			}
 
 			var args map[string]interface{}
-			json.Unmarshal([]byte(tc.Arguments), &args)
+			_ = json.Unmarshal([]byte(tc.Arguments), &args)
 
 			toolResult := toolExecutor(tc.Name, args)
 
@@ -172,7 +172,7 @@ func (r *EvalRunner) RunEvals(cases_ []EvalCase, models []string, toolExecutor T
 
 func (r *EvalRunner) SaveReport(report EvalReport, outputPath string) {
 	dir := filepath.Dir(outputPath)
-	os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0755)
 
 	output := map[string]interface{}{
 		"timestamp": report.Timestamp,

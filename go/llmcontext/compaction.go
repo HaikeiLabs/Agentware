@@ -102,7 +102,7 @@ func (c *Compactor) summarizeHistory(oldFiles, recentFiles []string) (string, er
 	var summary strings.Builder
 
 	if len(oldFiles) > 0 {
-		summary.WriteString(fmt.Sprintf("Previous Work Summary (%d earlier rounds):\n\n", len(oldFiles)))
+		fmt.Fprintf(&summary, "Previous Work Summary (%d earlier rounds):\n\n", len(oldFiles))
 	}
 
 	for _, file := range oldFiles {
@@ -117,27 +117,27 @@ func (c *Compactor) summarizeHistory(oldFiles, recentFiles []string) (string, er
 			if data, err := os.ReadFile(toolCallsFile); err == nil {
 				if json.Unmarshal(data, &calls) == nil && len(calls) > 0 {
 					foundToolCalls = true
-					summary.WriteString(fmt.Sprintf("- Round %s: %d tool call(s)\n", roundNum, len(calls)))
+					fmt.Fprintf(&summary, "- Round %s: %d tool call(s)\n", roundNum, len(calls))
 
 					for _, call := range calls {
-						summary.WriteString(fmt.Sprintf("  - %s", call.Name))
+						fmt.Fprintf(&summary, "  - %s", call.Name)
 
 						if args, ok := call.Args.(map[string]interface{}); ok {
 							if file, ok := args["file"].(string); ok {
-								summary.WriteString(fmt.Sprintf(" (file: %s)", file))
+								fmt.Fprintf(&summary, " (file: %s)", file)
 							}
 							if pattern, ok := args["pattern"].(string); ok {
-								summary.WriteString(fmt.Sprintf(" (pattern: %s)", pattern))
+								fmt.Fprintf(&summary, " (pattern: %s)", pattern)
 							}
 							if path, ok := args["path"].(string); ok {
-								summary.WriteString(fmt.Sprintf(" (path: %s)", path))
+								fmt.Fprintf(&summary, " (path: %s)", path)
 							}
 							if command, ok := args["command"].(string); ok {
 								// Truncate long commands
 								if len(command) > 50 {
 									command = command[:50] + "..."
 								}
-								summary.WriteString(fmt.Sprintf(" (cmd: %s)", command))
+								fmt.Fprintf(&summary, " (cmd: %s)", command)
 							}
 						}
 						summary.WriteString("\n")
@@ -154,7 +154,7 @@ func (c *Compactor) summarizeHistory(oldFiles, recentFiles []string) (string, er
 										lines := strings.Split(result.Output, "\n")
 										for _, line := range lines {
 											if strings.HasPrefix(line, "Modified:") {
-												summary.WriteString(fmt.Sprintf("  %s\n", strings.TrimSpace(line)))
+												fmt.Fprintf(&summary, "  %s\n", strings.TrimSpace(line))
 											}
 										}
 									}
@@ -175,7 +175,7 @@ func (c *Compactor) summarizeHistory(oldFiles, recentFiles []string) (string, er
 				if len(response) > 100 {
 					response = response[:100] + "..."
 				}
-				summary.WriteString(fmt.Sprintf("- Round %s: %s\n", roundNum, response))
+				fmt.Fprintf(&summary, "- Round %s: %s\n", roundNum, response)
 			}
 		}
 	}
@@ -183,7 +183,7 @@ func (c *Compactor) summarizeHistory(oldFiles, recentFiles []string) (string, er
 	summary.WriteString("\nRecent Context:\n")
 	for _, file := range recentFiles {
 		roundNum := strings.TrimSuffix(file, "-prompt.txt")
-		summary.WriteString(fmt.Sprintf("- %s: (kept for context)\n", roundNum))
+		fmt.Fprintf(&summary, "- %s: (kept for context)\n", roundNum)
 	}
 
 	return summary.String(), nil

@@ -1,15 +1,12 @@
 package proxy
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/soypete/pedro-agentware/go/llm"
@@ -66,7 +63,8 @@ func (h *Handler) handleChatCompletions(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "failed to read request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	// #nosec G104
+	defer func() { _ = r.Body.Close() }()
 
 	var req map[string]any
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -143,7 +141,8 @@ func (h *Handler) handleNonStreaming(w http.ResponseWriter, req map[string]any, 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(openAIResp)
+	// #nosec G104
+	_ = json.NewEncoder(w).Encode(openAIResp)
 }
 
 func (h *Handler) handleStreaming(w http.ResponseWriter, req map[string]any, messages []llm.Message, tools []llm.ToolDefinition) {
@@ -182,7 +181,8 @@ func (h *Handler) handleStreaming(w http.ResponseWriter, req map[string]any, mes
 		FinishReason: result.FinishReason,
 	})
 	data, _ := json.Marshal(openAIChunk)
-	fmt.Fprintf(w, "data: %s\n\n", string(data))
+	// #nosec G104
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", string(data))
 	flusher.Flush()
 
 	if len(result.ToolCalls) > 0 {
@@ -194,13 +194,15 @@ func (h *Handler) handleStreaming(w http.ResponseWriter, req map[string]any, mes
 			}
 		}
 		if hasRespondTool {
-			fmt.Fprintf(w, "data: [DONE]\n\n")
+			// #nosec G104
+			_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
 			flusher.Flush()
 			return
 		}
 	}
 
-	fmt.Fprintf(w, "data: [DONE]\n\n")
+	// #nosec G104
+	_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
 }
 
@@ -289,12 +291,14 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	// #nosec G104
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	// #nosec G104
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status":    "ok",
 		"backend":   h.config.BackendURL,
 		"model":     h.config.Model,
@@ -304,52 +308,4 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 type StreamingFlusher interface {
 	Flush()
-}
-
-func parseRequest(body []byte) (messages []map[string]any, tools []map[string]any, err error) {
-	var req struct {
-		Messages []map[string]any `json:"messages"`
-		Tools    []map[string]any `json:"tools"`
-	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, nil, err
-	}
-	return req.Messages, req.Tools, nil
-}
-
-func proxyRequest(ctx context.Context, backendURL string, body []byte, apiKey string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", backendURL+"/v1/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-
-	client := &http.Client{Timeout: 5 * time.Minute}
-	return client.Do(req)
-}
-
-func readSSEStream(respBody io.Reader, onChunk func(string)) error {
-	reader := bufio.NewReader(respBody)
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "data: [DONE]") {
-			continue
-		}
-
-		if strings.HasPrefix(line, "data: ") {
-			onChunk(strings.TrimPrefix(line, "data: "))
-		}
-	}
 }

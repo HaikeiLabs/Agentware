@@ -1,6 +1,7 @@
 """Integration test configuration for adapters."""
 
 import os
+
 import pytest
 
 

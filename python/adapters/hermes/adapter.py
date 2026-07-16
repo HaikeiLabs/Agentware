@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..base import AgentBackend, AgentResult, AgentTool
+from ..base import AgentResult, AgentTool
 from .client import Client
 
 

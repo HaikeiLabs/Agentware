@@ -24,14 +24,14 @@ func TestIntegration_HealthEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
 	var result map[string]any
-	json.NewDecoder(resp.Body).Decode(&result)
+	json.NewDecoder(resp.Body).Decode(&result) //nolint:errcheck
 
 	if result["status"] != "ok" {
 		t.Errorf("expected status 'ok', got %v", result["status"])
@@ -55,14 +55,14 @@ func TestIntegration_ModelsEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
 	var result map[string]any
-	json.NewDecoder(resp.Body).Decode(&result)
+	json.NewDecoder(resp.Body).Decode(&result) //nolint:errcheck
 
 	data := result["data"].([]any)
 	if len(data) == 0 {
@@ -92,7 +92,7 @@ func TestIntegration_InvalidRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", resp.StatusCode)

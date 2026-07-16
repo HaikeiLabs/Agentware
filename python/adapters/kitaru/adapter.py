@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..base import AgentBackend, AgentResult, AgentTool
+from ..base import AgentResult, AgentTool
 from .client import Client
 
 

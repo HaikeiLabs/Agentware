@@ -3,10 +3,11 @@ Eval harness runner - runs evals against models sequentially.
 """
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from evals.models import ModelBackend, create_model_client
 
@@ -17,7 +18,7 @@ class EvalCase:
     description: str
     system_prompt: str
     user_message: str
-    tools: list[dict]
+    tools: list[dict[str, Any]]
     expected_tool: str
     max_turns: int = 10
 
@@ -28,7 +29,7 @@ class EvalResult:
     model_name: str
     success: bool
     turns: int
-    tool_calls: list[dict]
+    tool_calls: list[dict[str, Any]]
     error: str = ""
     duration_ms: int = 0
 
@@ -55,34 +56,33 @@ class EvalRunner:
         self.results: list[EvalResult] = []
 
     def run_case(self, case: EvalCase, model: str,
-                 tool_executor: Callable[[str, dict], str]) -> EvalResult:
+                 tool_executor: Callable[[str, dict[str, Any]], str]) -> EvalResult:
         start = time.time()
         client = create_model_client(self.backend, model, self.base_url)
-        
-        messages = [
+
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": case.system_prompt},
             {"role": "user", "content": case.user_message},
         ]
-        
-        tool_calls_made = []
+
+        tool_calls_made: list[dict[str, Any]] = []
         turns = 0
-        error = ""
-        
+
         try:
             while turns < case.max_turns:
                 result = client.complete(messages, tools=case.tools)
                 turns += 1
-                
+
                 if not result.tool_calls:
                     break
-                
+
                 for tc in result.tool_calls:
                     tool_calls_made.append({
                         "turn": turns,
                         "name": tc["name"],
                         "arguments": tc["arguments"]
                     })
-                    
+
                     if tc["name"] == case.expected_tool:
                         duration_ms = int((time.time() - start) * 1000)
                         return EvalResult(
@@ -93,7 +93,7 @@ class EvalRunner:
                             tool_calls=tool_calls_made,
                             duration_ms=duration_ms
                         )
-                    
+
                     tool_result = tool_executor(tc["name"], json.loads(tc["arguments"]))
                     messages.append({
                         "role": "assistant",
@@ -112,7 +112,7 @@ class EvalRunner:
                         "tool_call_id": tc["id"],
                         "content": tool_result
                     })
-            
+
             duration_ms = int((time.time() - start) * 1000)
             return EvalResult(
                 case_name=case.name,
@@ -123,7 +123,7 @@ class EvalRunner:
                 error=f"Expected tool '{case.expected_tool}' not called in {turns} turns",
                 duration_ms=duration_ms
             )
-            
+
         except Exception as e:
             duration_ms = int((time.time() - start) * 1000)
             return EvalResult(
@@ -137,12 +137,12 @@ class EvalRunner:
             )
 
     def run_evals(self, cases: list[EvalCase], models: list[str],
-                  tool_executor: Callable[[str, dict], str]) -> EvalReport:
+                  tool_executor: Callable[[str, dict[str, Any]], str]) -> EvalReport:
         report = EvalReport(
             timestamp=datetime.now().isoformat(),
             models=models
         )
-        
+
         for model in models:
             print(f"\n=== Testing model: {model} ===")
             for case in cases:
@@ -159,7 +159,7 @@ class EvalRunner:
 
         return report
 
-    def save_report(self, report: EvalReport, output_path: Path):
+    def save_report(self, report: EvalReport, output_path: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump({

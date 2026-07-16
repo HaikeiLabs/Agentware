@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ..base import AgentBackend, AgentResult, AgentTool
+from ..base import AgentResult, AgentTool
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent

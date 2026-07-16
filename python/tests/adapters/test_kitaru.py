@@ -1,10 +1,10 @@
 """Unit tests for Kitaru adapter."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from adapters.kitaru import Client, KitaruAdapter, KitaruConfig, create_adapter
-from adapters.base import AgentTool, AgentResult
 
 
 class TestKitaruClient:
@@ -86,8 +86,9 @@ class TestKitaruExecution:
 
     def test_execution_creation(self):
         """Test Execution creation."""
-        from adapters.kitaru import Execution
         from datetime import datetime
+
+        from adapters.kitaru import Execution
 
         exec = Execution(
             id="exec-123",
