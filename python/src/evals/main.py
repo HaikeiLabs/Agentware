@@ -9,9 +9,9 @@ import json
 import os
 from pathlib import Path
 
-from testing.evals.cases.file_search import FILE_SEARCH_CASES
-from testing.evals.cases.general import GENERAL_CASES
-from testing.evals.runner import EvalRunner
+from evals.cases.file_search import FILE_SEARCH_CASES
+from evals.cases.general import GENERAL_CASES
+from evals.runner import EvalRunner
 
 
 def get_cwd() -> Path:
@@ -84,7 +84,7 @@ def main():
     runner = EvalRunner(base_url=args.base_url, max_turns=args.max_turns)
     report = runner.run_evals(cases, models, mock_tool_executor)
     
-    output_dir = Path("testing/evals/output")
+    output_dir = Path("python/src/evals/output")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / output_file
     runner.save_report(report, output_path)

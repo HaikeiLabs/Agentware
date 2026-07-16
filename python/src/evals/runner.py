@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from testing.evals.models import ModelClient
+from evals.models import ModelClient
 
 
 @dataclass

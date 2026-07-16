@@ -1,7 +1,7 @@
 """
 File search tool call test cases.
 """
-from testing.evals.runner import EvalCase
+from evals.runner import EvalCase
 
 FILE_SEARCH_TOOLS = [
     {
