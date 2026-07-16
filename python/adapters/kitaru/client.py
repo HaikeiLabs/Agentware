@@ -4,7 +4,6 @@ Kitaru is a Python library (pip install kitaru), not a REST API.
 This client wraps the Kitaru Python library for use with pedro-agentware.
 """
 
-import importlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any

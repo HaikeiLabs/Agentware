@@ -5,18 +5,18 @@ Usage: python -m evals.main [--file-search | --general | --github | --calendar |
 """
 import argparse
 import json
-import os
 from pathlib import Path
+from typing import Any
 
+from evals.cases.calendar import CALENDAR_CASES
 from evals.cases.file_search import FILE_SEARCH_CASES
 from evals.cases.general import GENERAL_CASES
 from evals.cases.github import GITHUB_CASES
-from evals.cases.calendar import CALENDAR_CASES
 from evals.models import ModelBackend
 from evals.runner import EvalRunner
 
 
-def mock_tool_executor(tool_name: str, args: dict) -> str:
+def mock_tool_executor(tool_name: str, args: dict[str, Any]) -> str:
     if tool_name == "glob":
         pattern = args.get("pattern", "")
         directory = args.get("directory", ".")
@@ -26,7 +26,7 @@ def mock_tool_executor(tool_name: str, args: dict) -> str:
     if tool_name == "read_file":
         path = args.get("path", "")
         try:
-            with open(path, "r") as f:
+            with open(path) as f:
                 return f.read()[:1000]
         except FileNotFoundError:
             return f"File not found: {path}"
@@ -93,7 +93,7 @@ def mock_tool_executor(tool_name: str, args: dict) -> str:
     return f"Mock result for {tool_name}"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run evals against models")
     parser.add_argument("--file-search", action="store_true", help="Run file search evals only")
     parser.add_argument("--general", action="store_true", help="Run general tool calling evals only")

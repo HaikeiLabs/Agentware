@@ -26,9 +26,32 @@ Reference documents in `business/`:
 
 ## Build, Lint, and Test Commands
 
-### Commands (To be implemented)
+### Python (pedro-agentware)
 
-Once the Go module is initialized, add these commands:
+```bash
+# Install dependencies
+cd python && pip install -e ".[dev]"
+
+# Run linter
+ruff check .
+
+# Run type checker
+mypy .
+
+# Run all tests
+pytest
+
+# Run a single test
+pytest -k TestName
+
+# Run with verbose output
+pytest -v
+
+# Format code
+ruff format .
+```
+
+### Go (middleware)
 
 ```bash
 # Build the module

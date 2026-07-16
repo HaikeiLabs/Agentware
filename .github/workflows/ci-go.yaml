@@ -54,7 +54,7 @@ jobs:
           echo "Coverage: $COVERAGE%"
 
       - name: Build
-        run: cd middleware && go build ./...
+        run: cd go && go build ./...
 
       - name: golangci-lint
         env:
@@ -63,7 +63,7 @@ jobs:
         with:
           version: v2.11
           skip-cache: true
-          working-directory: ./middleware
+          working-directory: ./go
 
       - name: Vet
-        run: cd middleware && go vet ./...
+        run: cd go && go vet ./...

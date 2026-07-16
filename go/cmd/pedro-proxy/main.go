@@ -48,22 +48,3 @@ func main() {
 		log.Printf("Shutdown error: %v", err)
 	}
 }
-
-func ensurePort(addr string) string {
-	if !containsPort(addr) {
-		return addr + ":8081"
-	}
-	return addr
-}
-
-func containsPort(addr string) bool {
-	for i := len(addr) - 1; i >= 0; i-- {
-		if addr[i] == ':' {
-			return true
-		}
-		if addr[i] < '0' || addr[i] > '9' {
-			return false
-		}
-	}
-	return false
-}

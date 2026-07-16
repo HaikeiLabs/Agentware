@@ -3,12 +3,13 @@ Model backends and Agent executor for evals.
 """
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 class ModelBackend(str, Enum):
@@ -33,12 +34,11 @@ class BaseModelClient(ABC):
     @abstractmethod
     def complete(
         self,
-        messages: list[dict],
-        tools: Optional[list[dict]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
-    ) -> ModelResult:
-        pass
+    ) -> ModelResult: ...
 
 
 class OpenAIClient(BaseModelClient):
@@ -46,7 +46,7 @@ class OpenAIClient(BaseModelClient):
         self,
         model: str,
         base_url: str = "https://api.openai.com/v1",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: int = 60,
     ):
         self.model = model
@@ -56,8 +56,8 @@ class OpenAIClient(BaseModelClient):
 
     def complete(
         self,
-        messages: list[dict],
-        tools: Optional[list[dict]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
     ) -> ModelResult:
@@ -111,7 +111,7 @@ class AnthropicClient(BaseModelClient):
     def __init__(
         self,
         model: str,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         base_url: str = "https://api.anthropic.com",
         timeout: int = 60,
     ):
@@ -122,8 +122,8 @@ class AnthropicClient(BaseModelClient):
 
     def complete(
         self,
-        messages: list[dict],
-        tools: Optional[list[dict]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
     ) -> ModelResult:
@@ -210,8 +210,8 @@ class OllamaClient(BaseModelClient):
 
     def complete(
         self,
-        messages: list[dict],
-        tools: Optional[list[dict]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
     ) -> ModelResult:
@@ -302,8 +302,8 @@ class VLLMClient(BaseModelClient):
 
     def complete(
         self,
-        messages: list[dict],
-        tools: Optional[list[dict]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
     ) -> ModelResult:
@@ -375,8 +375,8 @@ class LlamaCPPClient(VLLMClient):
 
     def complete(
         self,
-        messages: list[dict],
-        tools: Optional[list[dict]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
     ) -> ModelResult:
@@ -430,8 +430,8 @@ class LlamaCPPClient(VLLMClient):
 def create_model_client(
     backend: ModelBackend,
     model: str,
-    base_url: Optional[str] = None,
-    api_key: Optional[str] = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
     timeout: int = 60,
 ) -> BaseModelClient:
     if backend == ModelBackend.OPENAI:
@@ -450,7 +450,7 @@ def create_model_client(
         return OpenAIClient(model, base_url or "http://localhost:8080/v1", api_key, timeout)
 
 
-ToolExecutor = Callable[[str, dict], str]
+ToolExecutor = Callable[[str, dict[str, Any]], str]
 
 
 class AgentExecutor:
@@ -473,18 +473,18 @@ class AgentExecutor:
         self,
         system_prompt: str,
         user_message: str,
-        tools: list[dict],
+        tools: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """
         Run agent with given prompt and tools.
         Returns dict with content, tool_calls, turns, success.
         """
-        messages = [
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
 
-        tool_calls_made = []
+        tool_calls_made: list[dict[str, Any]] = []
         turns = 0
         result = None
 

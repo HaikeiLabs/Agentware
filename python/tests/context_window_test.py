@@ -21,7 +21,7 @@ def make_messages(count: int) -> list[Message]:
     ]
 
 
-class TestContextWindowManager_UpdateTokenCount:
+class TestContextWindowManagerUpdateTokenCount:  # noqa: N801
     def test_update_token_count_stores_value(self):
         mgr = ContextWindowManager(1000, default_counter)
         mgr.update_token_count(500)
@@ -41,7 +41,7 @@ class TestContextWindowManager_UpdateTokenCount:
         assert not needs_compact_before
 
 
-class TestContextWindowManager_Check_UsesActualCount:
+class TestContextWindowManagerCheckUsesActualCount:  # noqa: N801
     def test_check_returns_false_when_under_threshold(self):
         mgr = ContextWindowManager(1000, default_counter)
         mgr.update_token_count(500)
@@ -62,7 +62,7 @@ class TestContextWindowManager_Check_UsesActualCount:
         assert should_compact
 
 
-class TestContextWindowManager_ShouldCompact_UsesActualCount:
+class TestContextWindowManagerShouldCompactUsesActualCount:  # noqa: N801
     def test_should_compact_false_when_under(self):
         mgr = ContextWindowManager(1000, default_counter)
         mgr.update_token_count(500)
@@ -77,7 +77,7 @@ class TestContextWindowManager_ShouldCompact_UsesActualCount:
         assert mgr.should_compact([])
 
 
-class TestContextWindowManager_Compact_ResetsTokenCount:
+class TestContextWindowManagerCompactResetsTokenCount:  # noqa: N801
     def test_compact_resets_last_known_tokens(self):
         mgr = ContextWindowManager(1000, default_counter)
         mgr.update_token_count(800)
@@ -91,7 +91,7 @@ class TestContextWindowManager_Compact_ResetsTokenCount:
         assert tokens != 800
 
 
-class TestContextWindowManager_ThreadSafety:
+class TestContextWindowManagerThreadSafety:  # noqa: N801
     def test_concurrent_access(self):
         mgr = ContextWindowManager(1000, default_counter)
         errors: list[Exception] = []
@@ -130,7 +130,7 @@ class TestDefaultCounter:
         assert count == 0
 
 
-class TestContextWindowManager_CheckThresholds:
+class TestContextWindowManagerCheckThresholds:  # noqa: N801
     def test_fires_once_per_threshold(self):
         def counter(messages):
             return 850
@@ -208,7 +208,7 @@ class TestContextWindowManager_CheckThresholds:
         assert warning is None
 
 
-class TestContextWindowManager_ThreadSafety_CheckThresholds:
+class TestContextWindowManagerThreadSafetyCheckThresholds:  # noqa: N801
     def test_concurrent_check_thresholds(self):
         mgr = ContextWindowManager(
             1000, default_counter, context_thresholds=[0.50]
@@ -243,7 +243,7 @@ class TestCompactEvent:
         mgr.set_compaction_ratio(0.5)
         messages = make_messages(10)
 
-        compacted = mgr.compact(messages)
+        mgr.compact(messages)
 
         assert len(received_events) == 1
         event = received_events[0]

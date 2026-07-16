@@ -1,12 +1,9 @@
 """Unit tests for Hermes adapter."""
 
 import subprocess
-
-import pytest
 from unittest.mock import MagicMock, patch
 
 from adapters.hermes import Client, HermesAdapter, HermesConfig, create_adapter
-from adapters.base import AgentTool, AgentResult
 
 
 class TestHermesClient:
@@ -134,8 +131,8 @@ class TestHermesAdapter:
         mock_client = MagicMock()
         adapter = HermesAdapter(client=mock_client)
 
-        tools1 = adapter.list_tools()
-        tools2 = adapter.list_tools()
+        adapter.list_tools()
+        adapter.list_tools()
 
         assert mock_list.call_count == 1
 

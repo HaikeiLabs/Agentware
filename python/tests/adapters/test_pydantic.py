@@ -1,10 +1,10 @@
 """Unit tests for Pydantic adapter."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from adapters.pydantic import PydanticAdapter, PydanticConfig, PydanticAdapterAsync, create_adapter
-from adapters.base import AgentResult
+import pytest
+
+from adapters.pydantic import PydanticAdapter, PydanticAdapterAsync, PydanticConfig, create_adapter
 
 
 class TestPydanticConfig:
