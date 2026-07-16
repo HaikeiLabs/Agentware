@@ -1,7 +1,7 @@
 """
 General tool calling test cases.
 """
-from testing.evals.runner import EvalCase
+from evals.runner import EvalCase
 
 GENERAL_TOOLS = [
     {
