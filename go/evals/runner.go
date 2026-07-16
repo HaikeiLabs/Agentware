@@ -197,5 +197,7 @@ func (r *EvalRunner) SaveReport(report EvalReport, outputPath string) {
 	output["results"] = results
 
 	data, _ := json.MarshalIndent(output, "", "  ")
-	os.WriteFile(outputPath, data, 0644)
+	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to write report: %v\n", err)
+	}
 }
