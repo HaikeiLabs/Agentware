@@ -25,9 +25,7 @@ func mockToolExecutor(toolName string, args map[string]interface{}) string {
 			files = files[:10]
 		}
 		result := make([]string, len(files))
-		for i, f := range files {
-			result[i] = f
-		}
+		copy(result, files)
 		data, _ := json.Marshal(result)
 		return string(data)
 
@@ -133,7 +131,9 @@ func main() {
 	report := runner.RunEvals(cases, modelList, mockToolExecutor)
 
 	outputDir := filepath.Join("python", "src", "evals", "output")
-	os.MkdirAll(outputDir, 0755)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to create output dir: %v\n", err)
+	}
 	outputPath := filepath.Join(outputDir, outputFile)
 	runner.SaveReport(report, outputPath)
 

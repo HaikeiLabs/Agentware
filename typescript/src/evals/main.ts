@@ -57,7 +57,7 @@ function safeEval(expr: string): number {
   return Number(result);
 }
 
-function globSyncSimple(pattern: string): string[] {
+function globSyncSimple(_pattern: string): string[] {
   return [];
 }
 

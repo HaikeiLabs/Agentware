@@ -150,13 +150,13 @@ class EvalRunner:
                 result = self.run_case(case, model, tool_executor)
                 self.results.append(result)
                 report.results.append(result)
-                
+
                 status = "PASS" if result.success else "FAIL"
                 print(f"{status} ({result.turns} turns, {result.duration_ms}ms)")
-                
+
                 if not result.success:
                     print(f"    Error: {result.error}")
-        
+
         return report
 
     def save_report(self, report: EvalReport, output_path: Path):
