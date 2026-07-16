@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
-import { EvalRunner } from "./runner";
-import { FileSearchCases } from "./cases/file_search";
-import { GeneralCases } from "./cases/general";
+import { EvalRunner } from "./runner.js";
+import { FileSearchCases } from "./cases/file_search.js";
+import { GeneralCases } from "./cases/general.js";
 
 async function mockToolExecutor(toolName: string, args: Record<string, unknown>): Promise<string> {
   switch (toolName) {
@@ -65,8 +65,8 @@ async function main() {
   const args = process.argv.slice(2);
   let fileSearch = false;
   let general = false;
-  let models = "nemotron-3-super-120b";
-  let baseURL = "http://pedrogpt:8080/v1";
+  let models = "qwen3.6-27b-mtp";
+  let baseURL = "http://pedrogpt:8000";
   let maxTurns = 10;
 
   for (let i = 0; i < args.length; i++) {

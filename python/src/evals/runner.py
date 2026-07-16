@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from evals.models import ModelClient
+from evals.models import ModelBackend, create_model_client
 
 
 @dataclass
@@ -48,15 +48,16 @@ class EvalReport:
 
 
 class EvalRunner:
-    def __init__(self, base_url: str, max_turns: int = 10):
+    def __init__(self, base_url: str, max_turns: int = 10, backend: ModelBackend = ModelBackend.OLLAMA):
         self.base_url = base_url
         self.max_turns = max_turns
+        self.backend = backend
         self.results: list[EvalResult] = []
 
-    def run_case(self, case: EvalCase, model: str, 
+    def run_case(self, case: EvalCase, model: str,
                  tool_executor: Callable[[str, dict], str]) -> EvalResult:
         start = time.time()
-        client = ModelClient(self.base_url, model)
+        client = create_model_client(self.backend, model, self.base_url)
         
         messages = [
             {"role": "system", "content": case.system_prompt},

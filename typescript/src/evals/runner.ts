@@ -1,4 +1,6 @@
-import { ModelClient, ChatMessage, ToolDefinition } from "./models";
+import * as fs from "fs";
+import * as path from "path";
+import { ModelClient, ChatMessage, ToolDefinition } from "./models.js";
 
 export { ToolDefinition };
 
@@ -162,8 +164,7 @@ export class EvalRunner {
   }
 
   saveReport(report: EvalReport, outputPath: string): void {
-    const fs = require("fs");
-    const dir = require("path").dirname(outputPath);
+    const dir = path.dirname(outputPath);
     fs.mkdirSync(dir, { recursive: true });
 
     const output = {
