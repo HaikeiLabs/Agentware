@@ -185,6 +185,32 @@ func CheckSKOSGraph(ctx context.Context, triples []types.Triple) ([]Violation, e
 // ErrNoTriples reports an empty graph passed to inference helpers.
 var ErrNoTriples = errors.New("ontology: no triples")
 
+// TransitiveBroader returns every concept reachable from subject via
+// skos:broader (the skos:broaderTransitive closure), in BFS order. Cycles
+// are tolerated: each node is visited once.
+func TransitiveBroader(triples []types.Triple, subject string) []string {
+	broader := make(map[string][]string)
+	for _, t := range triples {
+		if t.Predicate == skosBroader {
+			broader[t.Subject] = append(broader[t.Subject], t.Object)
+		}
+	}
+	seen := map[string]bool{subject: true}
+	var out []string
+	queue := append([]string{}, broader[subject]...)
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
+		out = append(out, c)
+		queue = append(queue, broader[c]...)
+	}
+	return out
+}
+
 // InferSymmetricRelated returns the skos:related triples implied by symmetry
 // (a related b ⇒ b related a) that are not already present.
 func InferSymmetricRelated(triples []types.Triple) []types.Triple {
