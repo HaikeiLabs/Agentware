@@ -62,7 +62,7 @@ func (x *Executor) Execute(ctx context.Context, toolName string, args map[string
 	case ToolGetClaims:
 		return x.getClaims(userID, args)
 	case ToolLint:
-		return x.lint(userID)
+		return x.lint(userID, args)
 	default:
 		return &tools.Result{Success: false, Error: "unknown memory tool: " + toolName}, nil
 	}
@@ -175,7 +175,19 @@ func (x *Executor) getClaims(userID string, args map[string]any) (*tools.Result,
 	return jsonResult(out)
 }
 
-func (x *Executor) lint(userID string) (*tools.Result, error) {
+// Lint-only constraint identifiers (write-time enforcement never blocks on
+// these; they are hygiene findings for the maintaining agent).
+const (
+	LintDanglingLink     = "dangling-link"
+	LintOrphanPage       = "orphan-page"
+	LintStalePage        = "stale-page"
+	LintMissingTypedLink = "missing-typed-links"
+)
+
+// defaultStaleDays is the lint threshold for the `updated` frontmatter date.
+const defaultStaleDays = 90
+
+func (x *Executor) lint(userID string, args map[string]any) (*tools.Result, error) {
 	pages, err := x.pages(userID)
 	if err != nil {
 		return nil, err
@@ -188,12 +200,24 @@ func (x *Executor) lint(userID string) (*tools.Result, error) {
 		}
 		return "", false
 	}
+	staleDays := defaultStaleDays
+	if d, ok := args["stale_days"].(float64); ok && d > 0 {
+		staleDays = int(d)
+	}
+	staleBefore := time.Now().AddDate(0, 0, -staleDays)
+
 	type lintIssue struct {
 		Page      string `json:"page,omitempty"`
 		Violation ontology.Violation
 	}
 	issues := []lintIssue{}
 	var abox []types.Triple
+	incoming := map[string]bool{}
+	for _, p := range pages {
+		for _, link := range p.AllLinks() {
+			incoming[link.Target] = true
+		}
+	}
 	for _, p := range pages {
 		for _, v := range x.tbox.ValidatePage(p, resolve, x.prefixes) {
 			issues = append(issues, lintIssue{Page: p.ID, Violation: v})
@@ -201,12 +225,39 @@ func (x *Executor) lint(userID string) (*tools.Result, error) {
 		if triples, err := p.Triples("", x.prefixes); err == nil {
 			abox = append(abox, triples...)
 		}
+		typedLinks := 0
 		for _, link := range p.AllLinks() {
 			if _, ok := resolve(link.Target); !ok {
 				issues = append(issues, lintIssue{Page: p.ID, Violation: ontology.Violation{
-					Constraint: "dangling-link",
+					Constraint: LintDanglingLink,
 					Term:       link.Target,
-					Message:    fmt.Sprintf("link target %q has no page", link.Target),
+					Message:    fmt.Sprintf("link target %q is mentioned but has no page", link.Target),
+				}})
+			}
+			if link.Pred != page.DefaultLinkPred {
+				typedLinks++
+			}
+		}
+		if len(pages) > 1 && !incoming[p.ID] && len(p.AllLinks()) == 0 {
+			issues = append(issues, lintIssue{Page: p.ID, Violation: ontology.Violation{
+				Constraint: LintOrphanPage,
+				Term:       p.ID,
+				Message:    "page has no links in or out",
+			}})
+		}
+		if typedLinks == 0 && len(p.AllLinks()) > 0 {
+			issues = append(issues, lintIssue{Page: p.ID, Violation: ontology.Violation{
+				Constraint: LintMissingTypedLink,
+				Term:       p.ID,
+				Message:    "page links only via bare skos:related; add typed predicates",
+			}})
+		}
+		if p.Updated != "" {
+			if updated, err := time.Parse("2006-01-02", p.Updated); err == nil && updated.Before(staleBefore) {
+				issues = append(issues, lintIssue{Page: p.ID, Violation: ontology.Violation{
+					Constraint: LintStalePage,
+					Term:       p.ID,
+					Message:    fmt.Sprintf("last updated %s (over %d days ago)", p.Updated, staleDays),
 				}})
 			}
 		}

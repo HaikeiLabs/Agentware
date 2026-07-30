@@ -1,5 +1,15 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 5.1 competency-question queries | DONE
+memory_query gains structured kinds (go/memory/query.go): prerequisites
+and builds_toward (cycle-safe BFS closures with depth), learning_path
+(skills appropriate for a role plus their transitive prerequisites,
+topologically ordered), contested_claims, low_confidence (threshold arg,
+default 0.6). Keyword search stays as the free-text fallback. Five new
+chain tests over a realistic skill graph written through the enforced
+path; full Go suite + vet green. (Committed in the prior commit; log
+updated here.)
+
 ## [2026-07-30] 4.1+4.2 TypeScript SDK + cross-SDK isolation | DONE
 `typescript/src/memory`: async WikiMemory MCP stdio client (spawns memctl
 serve per user; pending-FIFO correlation; same surface as Python minus

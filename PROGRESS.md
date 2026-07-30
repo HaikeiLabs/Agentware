@@ -29,7 +29,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 - [x] Cross-SDK test: page written via Python SDK readable via TS SDK for same user, invisible for different user
 
 ## Phase 5 — Query, lint, report
-- [ ] `memory_query` answers L2WS competency questions + contested claims + low-confidence claims
+- [x] `memory_query` answers L2WS competency questions + contested claims + low-confidence claims
 - [ ] `memory_lint`: orphan pages, pageless concepts, stale pages, missing typed links
 - [ ] E2E in CI: fresh clone → enable memory → ingest → infer → query, green
 - [ ] `REPORT.md`
