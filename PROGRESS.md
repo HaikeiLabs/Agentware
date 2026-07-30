@@ -6,7 +6,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 
 ## Phase 0 — Scaffold + decisions
 - [x] Placement decision (in-monorepo) + Go RDF lib spike (knakk/rdf) → `DECISIONS.md`
-- [ ] `memory/` package skeleton, per-user vault layout, `SCHEMA.md`, `SCHEMA_GAPS.md`, ontologies submodule
+- [x] `memory/` package skeleton, per-user vault layout, `SCHEMA.md`, `SCHEMA_GAPS.md`, ontologies submodule
 
 ## Phase 1 — Validation core (shared package)
 - [ ] Frontmatter + typed-wikilink parser → N-Triples (A-box)
