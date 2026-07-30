@@ -130,31 +130,13 @@ func (x *Executor) ingest(userID string, args map[string]any) (*tools.Result, er
 		ModifiedFiles: []string{path}}, nil
 }
 
-// query is the v1 surface: keyword match over page ids, labels, and topics.
-// Phase 5 replaces this with competency-question support.
+// query answers competency questions via args.kind (see query.go) or falls
+// back to keyword matching over args.question.
 func (x *Executor) query(userID string, args map[string]any) (*tools.Result, error) {
-	q := strings.ToLower(stringArg(args, "question"))
-	pages, err := x.pages(userID)
-	if err != nil {
-		return nil, err
+	if kind := stringArg(args, "kind"); kind != "" {
+		return x.structuredQuery(userID, kind, args)
 	}
-	type hit struct {
-		ID     string   `json:"id"`
-		Type   string   `json:"type"`
-		Labels []string `json:"labels,omitempty"`
-	}
-	hits := []hit{}
-	for _, p := range pages {
-		haystack := strings.ToLower(p.ID + " " + strings.Join(p.Labels, " ") + " " + strings.Join(p.Topics, " "))
-		for word := range strings.FieldsSeq(q) {
-			if strings.Contains(haystack, word) {
-				hits = append(hits, hit{ID: p.ID, Type: p.Type, Labels: p.Labels})
-				break
-			}
-		}
-	}
-	sort.Slice(hits, func(i, j int) bool { return hits[i].ID < hits[j].ID })
-	return jsonResult(hits)
+	return x.keywordQuery(userID, stringArg(args, "question"))
 }
 
 func (x *Executor) getClaims(userID string, args map[string]any) (*tools.Result, error) {
