@@ -1,5 +1,16 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 3.1 Python SDK WikiMemory + LangGraph tools | DONE
+`pedro_agentware.memory`: WikiMemory spawns `memctl serve` per user (MCP
+stdio, per SDK plan subprocess mode), implements the SDK's ToolExecutor
+protocol so it composes into MiddlewareImpl; native API (ingest,
+write_page, query, get_claims, lint), parse_diagnostics for the DENY
+payload; LangGraphMemoryTools exposes the five tools as plain callables
+(denies render as "DENIED: ..." with diagnostics so agents self-correct).
+Tests build the real Go binary and exercise round-trip, deny diagnostics,
+cross-user isolation. Go executor now emits [] not null for empty results.
+ruff + mypy --strict clean.
+
 ## [2026-07-30] 2.x MCP stdio server + memctl serve | DONE
 `go/mcp`: minimal MCP server (JSON-RPC 2.0 newline-delimited over any
 reader/writer; initialize, ping, tools/list, tools/call) serving a
