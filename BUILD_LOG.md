@@ -1,5 +1,15 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 2.1 OntologyEvaluator + declarative policy | DONE
+`go/memory`: two-tier evaluator implementing middleware.PolicyEvaluator —
+tier 1 embedded policy.yaml (deny-by-default, scope-override + anonymous
+denies, per-user+tool rate limits via middleware.RateLimiter, since the
+stock engine matches MaxRate but doesn't enforce it); tier 2 semantic
+validation of write content (page contract, T-box, vault-graph SKOS checks
+via VaultReader — cycle-introducing write denied). DENY reasons embed JSON
+diagnostics after a "diagnostics: " marker; ParseDiagnostics round-trips
+them for agent self-correction. 9 new tests, module green.
+
 ## [2026-07-30] 1.3 thesaurus fixture gate | DONE
 Fixture tests: full_skos + transitive_broader pass, cycle_detection +
 inconsistency_broader_narrower rejected with diagnostics, symmetric_related

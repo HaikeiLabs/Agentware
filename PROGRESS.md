@@ -14,7 +14,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 - [x] Fixture tests per the thesaurus files (pass full_skos + transitive_broader; reject cycle_detection + inconsistency_broader_narrower with diagnostics; infer symmetry from symmetric_related)
 
 ## Phase 2 — Middleware integration (Go core)
-- [ ] `OntologyEvaluator` implementing `PolicyEvaluator`; declarative policy YAML (deny-by-default, user-scope rule, rate limits)
+- [x] `OntologyEvaluator` implementing `PolicyEvaluator`; declarative policy YAML (deny-by-default, user-scope rule, rate limits)
 - [ ] Memory executor wired via `NewMiddleware(exec).WithAuditor(...)`; MCP tools registered (memory_ingest, memory_write_page, memory_query, memory_get_claims, memory_lint)
 - [ ] Tests: valid write → ALLOW; unknown class → DENY + nearest-term diagnostic; cycle-introducing link → DENY; denies audited; user A cannot touch user B's vault (policy AND path check)
 - [ ] agentware API gaps → upstream issue/PR, noted in `BLOCKERS.md`
