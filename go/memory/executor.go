@@ -380,9 +380,8 @@ func (x *Executor) appendLog(userID, entry string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	_, err = fmt.Fprintf(f, "- [%s] %s\n", time.Now().UTC().Format("2006-01-02 15:04:05"), entry)
-	return err
+	return errors.Join(err, f.Close())
 }
 
 func jsonResult(v any) (*tools.Result, error) {

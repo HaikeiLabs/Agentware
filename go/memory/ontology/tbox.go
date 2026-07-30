@@ -57,7 +57,7 @@ func Load(paths ...string) (*TBox, error) {
 			return nil, fmt.Errorf("ontology: open %s: %w", path, err)
 		}
 		triples, err := ttl.NewTurtleParser().Parse(f)
-		f.Close()
+		_ = f.Close() // read-only handle; a parse error takes precedence
 		if err != nil {
 			return nil, fmt.Errorf("ontology: parse %s: %w", path, err)
 		}
