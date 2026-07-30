@@ -1,5 +1,14 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 1.3 thesaurus fixture gate | DONE
+Fixture tests: full_skos + transitive_broader pass, cycle_detection +
+inconsistency_broader_narrower rejected with diagnostics, symmetric_related
+symmetry inferred (idempotent), cycle-safe TransitiveBroader closure added.
+The gate exposed an upstream bug: ontology-go's inconsistent-hierarchy
+check tested the inverse direction (false positives on full_skos, false
+negative on the inconsistency fixture). Fixed upstream per loop rules —
+ontology-go PR #18 — and pinned go.mod to the fix commit (BLOCKERS.md).
+
 ## [2026-07-30] 1.2 T-box validation rules + memctl lint | DONE
 `go/memory/ontology`: TBox loader (classes, properties w/ domain+range,
 SKOS concepts, label index) over ontology-go's ttl parser; ValidatePage
