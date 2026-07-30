@@ -1,5 +1,5 @@
-github.com/soypete/ontology-go v0.0.0-20260730165556-4c8e635acec4 h1:kcQsVxjmHayIQVp/AGSIKTVofuTMEmuNzyGkiUiB2uc=
-github.com/soypete/ontology-go v0.0.0-20260730165556-4c8e635acec4/go.mod h1:+BZoiJwLiTKf1T9tzoT37PDtuEXtrOZW6iUuY/CXPjU=
+github.com/soypete/ontology-go v0.0.0-20260730193222-0c5ba6ae2cd5 h1:4mePEU1WwbXK2MGIAcjOWX4gmNi261Go9QNg3sA6/mA=
+github.com/soypete/ontology-go v0.0.0-20260730193222-0c5ba6ae2cd5/go.mod h1:+BZoiJwLiTKf1T9tzoT37PDtuEXtrOZW6iUuY/CXPjU=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
