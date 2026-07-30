@@ -1,5 +1,19 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 3.2 pgmpy inference engine + JSON contract | DONE
+Contract at go/memory/infer/schema.json (one schema for subprocess and
+future MCP transports). Engine at pedro_agentware.memory.infer (pgmpy
+DiscreteMarkovNetwork; 'inference' extra; runnable via python -m for the
+Go subprocess transport): binary claim/source nodes, agreement/
+disagreement potentials (supports 0.8, contradicts 0.9, sourceOf 0.85),
+source priors 0.7 default / 0.4 superseded, BP first with Gibbs fallback,
+contested = contradicts edge vs claim above 0.6. Tuned sourceOf from 0.7
+to 0.85 after numeric probing (mutual-support case peaked at 0.74
+otherwise); edge-less sources dropped so BP's junction tree stays
+connected. Spec tests: mutual 0.877 (>0.85), superseded+contradicted
+0.223 (<0.5, contested), cycle exact via BP. Full python suite 118 pass
+(pytest -p pytest_asyncio.plugin under uv py3.12 venv).
+
 ## [2026-07-30] 3.1 Python SDK WikiMemory + LangGraph tools | DONE
 `pedro_agentware.memory`: WikiMemory spawns `memctl serve` per user (MCP
 stdio, per SDK plan subprocess mode), implements the SDK's ToolExecutor

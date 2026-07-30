@@ -21,7 +21,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 
 ## Phase 3 — Python SDK + inference
 - [x] `WikiMemory` enablement in Python SDK (composable option, user scope from CallerContext), LangGraph integration exposing memory tools
-- [ ] pgmpy inference engine + JSON contract; unit tests (mutual support > 0.85; contradicted+superseded < 0.5 and contested; convergence or Gibbs fallback on cycle)
+- [x] pgmpy inference engine + JSON contract; unit tests (mutual support > 0.85; contradicted+superseded < 0.5 and contested; convergence or Gibbs fallback on cycle)
 - [ ] Dogfood: LangGraph agent ingests 3 overlapping sources + 1 contradicting source; confidence drops, flag sets, deny→retry logged
 
 ## Phase 4 — TypeScript SDK
