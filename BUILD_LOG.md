@@ -1,5 +1,16 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 4.1+4.2 TypeScript SDK + cross-SDK isolation | DONE
+`typescript/src/memory`: async WikiMemory MCP stdio client (spawns memctl
+serve per user; pending-FIFO correlation; same surface as Python minus
+inference), parseDiagnostics, and memoryTools() in the Vercel AI SDK tool
+shape (zod parameters; denies render as "DENIED: ..." for
+self-correction). Jest: 5 new tests incl. cross-SDK — a page written via
+the Python SDK is queryable via the TS SDK for the same user and invisible
+(empty query + claims) for another user. tsc build green, 131 TS tests
+pass. Note: `npm run lint` is broken pre-existing (direct minimatch@10.2.3
+pin shadows eslint 8's CJS minimatch) — untouched by this work.
+
 ## [2026-07-30] 3.3 dogfood: enforced ingest → contradiction → inference | DONE
 Schema gains claim-to-claim refs (claims[].supports/contradicts, "c2" or
 "page#c2") — parsed in Go, surfaced by memory_get_claims, documented in

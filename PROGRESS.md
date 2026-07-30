@@ -25,8 +25,8 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 - [x] Dogfood: LangGraph agent ingests 3 overlapping sources + 1 contradicting source; confidence drops, flag sets, deny→retry logged
 
 ## Phase 4 — TypeScript SDK
-- [ ] Enablement surface + MCP client parity with Python (minus inference); one TS framework integration example
-- [ ] Cross-SDK test: page written via Python SDK readable via TS SDK for same user, invisible for different user
+- [x] Enablement surface + MCP client parity with Python (minus inference); one TS framework integration example (Vercel AI SDK tool shape)
+- [x] Cross-SDK test: page written via Python SDK readable via TS SDK for same user, invisible for different user
 
 ## Phase 5 — Query, lint, report
 - [ ] `memory_query` answers L2WS competency questions + contested claims + low-confidence claims
