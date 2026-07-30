@@ -93,7 +93,7 @@ func (e *OntologyEvaluator) Evaluate(toolName string, args map[string]any, calle
 	if denied, d := e.rateLimited(decision, toolName, caller); denied {
 		return d
 	}
-	if !isWriteTool(toolName) {
+	if !isSemanticWrite(toolName) {
 		return decision
 	}
 	return e.evaluateWrite(decision, args, caller)

@@ -1,5 +1,20 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 2.2+2.3 executor, chain wiring, isolation tests | DONE
+`go/memory`: Executor (five tools over the per-user vault, every path
+re-checked against the vault boundary, index/log maintenance, v1 keyword
+query, claims listing, vault lint incl. dangling links) implementing both
+ToolExecutor and VaultReader; WikiMemory Enable(Config) wiring
+NewMiddleware(exec).WithPolicy(OntologyEvaluator).WithAuditor(...);
+RegisterTools for the tool registry. Added exported
+middleware.CallerFromContext (in-repo API gap — executors couldn't read
+the caller). Chain tests: valid write persists + index/log update; deny
+carries diagnostics AND lands in auditor; cycle via real vault denied;
+anonymous denied; cross-user isolation (policy deny on scope-override arg,
+scoped query/claims, path rejection). Note: the repo has no MCP server
+package yet — tools are registry-registered; MCP exposure rides the SDK
+transport work.
+
 ## [2026-07-30] 2.1 OntologyEvaluator + declarative policy | DONE
 `go/memory`: two-tier evaluator implementing middleware.PolicyEvaluator —
 tier 1 embedded policy.yaml (deny-by-default, scope-override + anonymous
