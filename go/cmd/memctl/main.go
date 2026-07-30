@@ -20,8 +20,12 @@ import (
 
 	"github.com/soypete/ontology-go/types"
 
+	"github.com/soypete/pedro-agentware/go/mcp"
+	"github.com/soypete/pedro-agentware/go/memory"
 	"github.com/soypete/pedro-agentware/go/memory/ontology"
 	"github.com/soypete/pedro-agentware/go/memory/page"
+	"github.com/soypete/pedro-agentware/go/middleware"
+	"github.com/soypete/pedro-agentware/go/tools"
 )
 
 func main() {
@@ -31,14 +35,52 @@ func main() {
 	switch os.Args[1] {
 	case "lint":
 		os.Exit(lint(os.Args[2:]))
+	case "serve":
+		os.Exit(serve(os.Args[2:]))
 	default:
 		usage()
 	}
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: memctl lint -tbox <file.ttl> [-tbox ...] <wiki-dir>")
+	fmt.Fprintln(os.Stderr, `usage:
+  memctl lint  -tbox <file.ttl> [-tbox ...] <wiki-dir>
+  memctl serve -tbox <file.ttl> [-tbox ...] -root <memory-root> -user <user-id> [-session <id>]`)
 	os.Exit(2)
+}
+
+// serve exposes the memory tools as an MCP stdio server scoped to one user.
+// SDK clients spawn one process per principal; the user can never be
+// overridden in-band (the policy denies args.user_id).
+func serve(args []string) int {
+	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	var paths tboxPaths
+	fs.Var(&paths, "tbox", "T-box Turtle file (repeatable)")
+	root := fs.String("root", "", "memory root directory")
+	user := fs.String("user", "", "vault owner (required)")
+	session := fs.String("session", "mcp", "session id for audit records")
+	_ = fs.Parse(args)
+	if *root == "" || *user == "" || len(paths) == 0 {
+		usage()
+	}
+	wiki, err := memory.Enable(memory.Config{Root: *root, TBoxPaths: paths})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	registry := tools.NewToolRegistry()
+	wiki.RegisterTools(registry)
+	server := mcp.NewServer(registry, middleware.CallerContext{
+		UserID:    *user,
+		SessionID: *session,
+		Source:    "mcp",
+		Trusted:   true,
+	})
+	if err := server.Serve(context.Background(), os.Stdin, os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	return 0
 }
 
 type tboxPaths []string
