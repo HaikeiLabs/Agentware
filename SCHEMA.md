@@ -54,6 +54,10 @@ Rules:
 - `claims[].id` — unique within the page; referenced by the inference
   engine. `confidence` is owned by inference (leave `null` on write);
   `contested: true` is set when a confident opposing claim exists.
+- `claims[].supports` / `claims[].contradicts` — optional lists of claim
+  references: `c2` for a claim in the same page, `other-page#c1` across
+  pages. These become the `supports`/`contradicts` edges of the Markov
+  link network.
 - `sources` — ids of entries under `raw/`.
 - `updated` — ISO date of last substantive edit.
 

@@ -1,5 +1,19 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 3.3 dogfood: enforced ingest → contradiction → inference | DONE
+Schema gains claim-to-claim refs (claims[].supports/contradicts, "c2" or
+"page#c2") — parsed in Go, surfaced by memory_get_claims, documented in
+SCHEMA.md. Python glue pedro_agentware.memory.confidence builds the
+inference request from vault claims and merges marginals back.
+examples/wiki_memory_dogfood.py drives the LangGraph tool surface against
+the real Go core: 3 overlapping sources ingested; first page write DENIED
+(twitch:Golang, unknown-concept) and self-corrected to twitch:Go from the
+nearest-term diagnostics (deny→retry logged); 4th contradicting source
+recorded; inference run and confidence written back through the enforced
+path. Results: c1 0.962→0.941 (drops), contrarian c3 0.211 with
+contested=true, all via belief propagation. Suite: 119 python + all Go
+green; ruff + mypy strict clean.
+
 ## [2026-07-30] 3.2 pgmpy inference engine + JSON contract | DONE
 Contract at go/memory/infer/schema.json (one schema for subprocess and
 future MCP transports). Engine at pedro_agentware.memory.infer (pgmpy
