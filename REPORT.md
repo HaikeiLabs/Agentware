@@ -88,12 +88,12 @@ contested; support cycle → exact via belief propagation.
 
 ## Known gaps
 
-- **ontology-go PR #18 pending** — the fixture gate exposed an inverted
+- **ontology-go PR #18 — merged.** The fixture gate exposed an inverted
   direction check in upstream's inconsistent-hierarchy validation (false
   positives on valid inverse pairs, false negative on the real
   contradiction). Fixed upstream with regression tests
-  (https://github.com/Soypete/ontology-go/pull/18); `go.mod` pins the
-  canonical module at the fix commit until merge (no fork).
+  (https://github.com/Soypete/ontology-go/pull/18, merged 2026-07-30);
+  `go.mod` tracks upstream main again.
 - **MCP transport is stdio-only** — one `memctl serve` process per
   principal. The SDK plan's HTTP+SSE sidecar mode (multi-user, caller
   identity per request) is not built.
