@@ -143,7 +143,7 @@ func (x *Executor) query(userID string, args map[string]any) (*tools.Result, err
 		Type   string   `json:"type"`
 		Labels []string `json:"labels,omitempty"`
 	}
-	var hits []hit
+	hits := []hit{}
 	for _, p := range pages {
 		haystack := strings.ToLower(p.ID + " " + strings.Join(p.Labels, " ") + " " + strings.Join(p.Topics, " "))
 		for word := range strings.FieldsSeq(q) {
@@ -171,7 +171,7 @@ func (x *Executor) getClaims(userID string, args map[string]any) (*tools.Result,
 		Confidence *float64 `json:"confidence"`
 		Contested  bool     `json:"contested,omitempty"`
 	}
-	var out []claimOut
+	out := []claimOut{}
 	for _, p := range pages {
 		if wantPage != "" && p.ID != wantPage {
 			continue
@@ -207,7 +207,7 @@ func (x *Executor) lint(userID string) (*tools.Result, error) {
 		Page      string `json:"page,omitempty"`
 		Violation ontology.Violation
 	}
-	var issues []lintIssue
+	issues := []lintIssue{}
 	var abox []types.Triple
 	for _, p := range pages {
 		for _, v := range x.tbox.ValidatePage(p, resolve, x.prefixes) {

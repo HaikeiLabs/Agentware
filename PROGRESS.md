@@ -20,7 +20,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 - [x] agentware API gaps → upstream issue/PR, noted in `BLOCKERS.md` (middleware.CallerFromContext added in-repo; ontology-go#18 upstream; missing mcp package tracked)
 
 ## Phase 3 — Python SDK + inference
-- [ ] `WikiMemory` enablement in Python SDK (composable option, user scope from CallerContext), LangGraph integration exposing memory tools
+- [x] `WikiMemory` enablement in Python SDK (composable option, user scope from CallerContext), LangGraph integration exposing memory tools
 - [ ] pgmpy inference engine + JSON contract; unit tests (mutual support > 0.85; contradicted+superseded < 0.5 and contested; convergence or Gibbs fallback on cycle)
 - [ ] Dogfood: LangGraph agent ingests 3 overlapping sources + 1 contradicting source; confidence drops, flag sets, deny→retry logged
 
