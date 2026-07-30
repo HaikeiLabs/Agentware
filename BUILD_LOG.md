@@ -1,5 +1,22 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 5.3 E2E CI workflow | DONE
+.github/workflows/memory-e2e.yml: fresh clone with submodules → Go 1.26
+core tests → memctl build + vault lint → uv python 3.12 with
+[dev,inference] extras → full pytest (client, inference, dogfood) →
+dogfood example as the explicit enable→ingest→deny/retry→infer→query
+chain (example now finishes with contested_claims and low_confidence
+queries; dogfood test asserts both return exactly c3) → Node LTS
+TypeScript suite incl. the cross-SDK isolation test. All steps verified
+locally before push.
+
+## [2026-07-30] 5.2 memory_lint hygiene checks | DONE
+Lint now layers hygiene findings over the ontology/SKOS checks:
+orphan-page (no links in or out), dangling-link (mentioned but pageless),
+stale-page (frontmatter `updated` older than stale_days, default 90),
+missing-typed-links (only bare skos:related). Chain test covers all four
+plus healthy-page silence and the tunable threshold.
+
 ## [2026-07-30] 5.1 competency-question queries | DONE
 memory_query gains structured kinds (go/memory/query.go): prerequisites
 and builds_toward (cycle-safe BFS closures with depth), learning_path

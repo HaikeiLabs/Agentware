@@ -156,6 +156,18 @@ def run(root: str) -> dict[str, Any]:
         assert out == "wrote go-worker-pools", out
         final_claims = memory.get_claims("go-worker-pools")[0]
 
+        # 5. Query the memory: contested claims and low-confidence claims.
+        contested_text, ok, err = memory.execute(
+            "memory_query", {"kind": "contested_claims"}
+        )
+        assert ok, err
+        contested_query = json.loads(contested_text)
+        low_text, ok, err = memory.execute(
+            "memory_query", {"kind": "low_confidence", "threshold": 0.6}
+        )
+        assert ok, err
+        low_confidence_query = json.loads(low_text)
+
     c1 = claim_node_id("go-worker-pools", "c1")
     c3 = claim_node_id("go-worker-pools", "c3")
     return {
@@ -169,6 +181,8 @@ def run(root: str) -> dict[str, Any]:
             c["id"]: {"confidence": c["confidence"], "contested": c.get("contested", False)}
             for c in final_claims
         },
+        "contested_query": [c["id"] for c in contested_query],
+        "low_confidence_query": [c["id"] for c in low_confidence_query],
         "method": response["method"],
     }
 

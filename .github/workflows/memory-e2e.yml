@@ -1,0 +1,79 @@
+name: Wiki Memory E2E
+
+# Fresh clone -> enable memory -> ingest -> infer -> query, across all
+# three SDK surfaces (Go core, Python client + inference, TS client).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'go/**'
+      - 'python/**'
+      - 'typescript/**'
+      - 'ontologies'
+      - '.github/workflows/memory-e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'go/**'
+      - 'python/**'
+      - 'typescript/**'
+      - 'ontologies'
+      - '.github/workflows/memory-e2e.yml'
+
+jobs:
+  memory-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Go core tests (memory, ontology, page, mcp)
+        run: |
+          cd go
+          go vet ./...
+          go test ./...
+
+      - name: Build memctl
+        run: |
+          cd go
+          go build -o "$RUNNER_TEMP/memctl" ./cmd/memctl
+          echo "PEDRO_MEMCTL=$RUNNER_TEMP/memctl" >> "$GITHUB_ENV"
+
+      - name: Lint example vault stays enforceable
+        run: |
+          mkdir -p /tmp/e2e-vault/wiki
+          printf -- '---\nid: goroutines\ntype: sw:Skill\nlabels: ["Goroutines"]\ntopics: [twitch:Go]\n---\n' \
+            > /tmp/e2e-vault/wiki/goroutines.md
+          "$PEDRO_MEMCTL" lint \
+            -tbox ontologies/education/TBOX_LEARNING_SOFTWARE.ttl \
+            -tbox ontologies/social/twitch_topics.ttl \
+            /tmp/e2e-vault/wiki
+
+      - name: Python SDK tests (client, inference, dogfood e2e)
+        run: |
+          cd python
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e ".[dev,inference]"
+          .venv/bin/python -m pytest tests/ -q
+
+      - name: Dogfood end-to-end (enable -> ingest -> deny/retry -> infer -> query)
+        run: |
+          cd python
+          .venv/bin/python examples/wiki_memory_dogfood.py
+
+      - name: TypeScript SDK tests (incl. cross-SDK isolation)
+        run: |
+          cd typescript
+          npm ci
+          npm run build
+          npm test
