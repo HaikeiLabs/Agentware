@@ -1,5 +1,16 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 1.2 T-box validation rules + memctl lint | DONE
+`go/memory/ontology`: TBox loader (classes, properties w/ domain+range,
+SKOS concepts, label index) over ontology-go's ttl parser; ValidatePage
+(class/property/concept existence, domain/range with transitive subclass,
+unknown-prefix) returning structured Violations with nearest-term
+suggestions (Levenshtein); CheckSKOSGraph wrapping ontology-go validate
+(cycles, broader/narrower inconsistency); InferSymmetricRelated.
+CI consumer: `go/cmd/memctl` `lint` subcommand (maintainer approved CLI
+tooling for this). Smoke test: bad page → 2 violations w/ suggestions,
+exit 1. Tests green against real T-box submodule.
+
 ## [2026-07-30] 1.1 page parser → A-box | DONE
 `go/memory/page`: YAML frontmatter parser (strict fields, kebab-case ids,
 CURIE types/preds, unique claim ids), typed-wikilink extraction

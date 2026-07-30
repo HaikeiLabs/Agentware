@@ -10,7 +10,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 
 ## Phase 1 — Validation core (shared package)
 - [x] Frontmatter + typed-wikilink parser → N-Triples (A-box)
-- [ ] T-box validation rules (class/predicate existence, domain/range, SKOS acyclicity + broader/narrower consistency) as ONE package with two consumers (OntologyEvaluator + CI check)
+- [x] T-box validation rules (class/predicate existence, domain/range, SKOS acyclicity + broader/narrower consistency) as ONE package with two consumers (OntologyEvaluator + CI check via `memctl lint`)
 - [ ] Fixture tests per the thesaurus files (pass full_skos + transitive_broader; reject cycle_detection + inconsistency_broader_narrower with diagnostics; infer symmetry from symmetric_related)
 
 ## Phase 2 — Middleware integration (Go core)
