@@ -49,6 +49,28 @@ without error and agreed on triple counts.
 **Consequence:** `go/memory/` builds a small internal graph index on top of
 knakk's triple stream; the T-box loader is read-only.
 
+## D5: RDF library — `github.com/soypete/ontology-go` (supersedes D2)
+
+**Decision:** per maintainer direction, use the maintainer's own RDF toolkit
+`github.com/soypete/ontology-go` instead of `knakk/rdf`.
+
+**Why it's a strictly better fit:**
+- `ttl` package: full Turtle parser → `[]types.Triple` (plain-string terms
+  with `IsLiteral`/`Language`/`Datatype` flags) — parses the T-box directly.
+- `validate` package: qSKOS-style validator that already detects
+  `circular_broader_relation` and `inconsistent_hierarchy` — precisely the
+  thesaurus fixture requirements for Phase 1.
+- `reasoner` package: TransitiveBroader/Narrower, SymmetricRelated, and
+  Inconsistency rules — covers the `transitive_broader.ttl` and
+  `symmetric_related.ttl` fixture behavior.
+- `sparql`/`store`: query layer usable by `memory_query` in Phase 5.
+- Same owner as this repo and the ontologies — gaps can be fixed upstream
+  (loop rule: upstream issues/PRs, never forks).
+
+**Consequence:** `knakk/rdf` removed. ontology-go has no tagged releases yet,
+so we pin a pseudo-version of `main`. N-Triples serialization is a small
+local formatter in `go/memory/page` (ontology-go has none).
+
 ## D3: Ontology distribution — git submodule at `ontologies/`
 
 **Decision:** vendor `github.com/Soypete/ontologies` as a git submodule at the

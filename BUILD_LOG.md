@@ -1,5 +1,13 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 1.1 page parser → A-box | DONE
+`go/memory/page`: YAML frontmatter parser (strict fields, kebab-case ids,
+CURIE types/preds, unique claim ids), typed-wikilink extraction
+(`[[t|pred=...]]` + bare → skos:related), A-box emission as N-Triples.
+Mid-iteration pivot on maintainer direction: RDF layer switched from
+knakk/rdf to `github.com/soypete/ontology-go` (D5 in DECISIONS.md) — its
+validate/reasoner packages also cover much of task 1.2. Tests green.
+
 ## [2026-07-30] 0.2 skeleton + vault + schema | DONE
 Added `ontologies/` submodule, `go/memory/` package (doc.go + Vault with
 per-user layout, kebab-case page ids, and path-boundary containment —

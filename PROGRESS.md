@@ -9,7 +9,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 - [x] `memory/` package skeleton, per-user vault layout, `SCHEMA.md`, `SCHEMA_GAPS.md`, ontologies submodule
 
 ## Phase 1 — Validation core (shared package)
-- [ ] Frontmatter + typed-wikilink parser → N-Triples (A-box)
+- [x] Frontmatter + typed-wikilink parser → N-Triples (A-box)
 - [ ] T-box validation rules (class/predicate existence, domain/range, SKOS acyclicity + broader/narrower consistency) as ONE package with two consumers (OntologyEvaluator + CI check)
 - [ ] Fixture tests per the thesaurus files (pass full_skos + transitive_broader; reject cycle_detection + inconsistency_broader_narrower with diagnostics; infer symmetry from symmetric_related)
 
