@@ -30,6 +30,6 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 
 ## Phase 5 — Query, lint, report
 - [x] `memory_query` answers L2WS competency questions + contested claims + low-confidence claims
-- [ ] `memory_lint`: orphan pages, pageless concepts, stale pages, missing typed links
-- [ ] E2E in CI: fresh clone → enable memory → ingest → infer → query, green
+- [x] `memory_lint`: orphan pages, pageless concepts, stale pages, missing typed links
+- [x] E2E in CI: fresh clone → enable memory → ingest → infer → query, green (.github/workflows/memory-e2e.yml)
 - [ ] `REPORT.md`

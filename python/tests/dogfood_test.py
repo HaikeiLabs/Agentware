@@ -54,3 +54,7 @@ def test_dogfood_scenario(
     written = report["written_back"]
     assert written["c1"]["confidence"] == pytest.approx(report["final_c1"])
     assert written["c3"]["contested"] is True
+
+    # And the queries see the inferred state.
+    assert report["contested_query"] == ["c3"]
+    assert report["low_confidence_query"] == ["c3"]
