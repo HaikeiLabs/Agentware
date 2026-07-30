@@ -17,7 +17,7 @@ Phases from the loop prompt; see `DECISIONS.md` for decisions,
 - [x] `OntologyEvaluator` implementing `PolicyEvaluator`; declarative policy YAML (deny-by-default, user-scope rule, rate limits)
 - [x] Memory executor wired via `NewMiddleware(exec).WithAuditor(...)`; tools registered (memory_ingest, memory_write_page, memory_query, memory_get_claims, memory_lint) — MCP server exposure pending (Phase 4 MCP client work; noted in BLOCKERS.md watch list)
 - [x] Tests: valid write → ALLOW; unknown class → DENY + nearest-term diagnostic; cycle-introducing link → DENY; denies audited; user A cannot touch user B's vault (policy AND path check)
-- [ ] agentware API gaps → upstream issue/PR, noted in `BLOCKERS.md`
+- [x] agentware API gaps → upstream issue/PR, noted in `BLOCKERS.md` (middleware.CallerFromContext added in-repo; ontology-go#18 upstream; missing mcp package tracked)
 
 ## Phase 3 — Python SDK + inference
 - [ ] `WikiMemory` enablement in Python SDK (composable option, user scope from CallerContext), LangGraph integration exposing memory tools

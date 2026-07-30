@@ -1,5 +1,16 @@
 # Wiki Memory — Build Log
 
+## [2026-07-30] 2.x MCP stdio server + memctl serve | DONE
+`go/mcp`: minimal MCP server (JSON-RPC 2.0 newline-delimited over any
+reader/writer; initialize, ping, tools/list, tools/call) serving a
+tools.ToolRegistry with a fixed CallerContext — one process per principal,
+matching the SDK plan's subprocess mode; scope can't be overridden in-band.
+`memctl serve -root -tbox -user` wires WikiMemory behind it. Policy denies
+surface as MCP tool errors with the diagnostics payload intact. Tests cover
+list/call round-trip, deny-with-diagnostics, unknown method/tool; smoke:
+piped JSON-RPC ingest landed in the vault. Closes the missing-MCP watch
+item for the stdio transport (HTTP+SSE still future).
+
 ## [2026-07-30] 2.2+2.3 executor, chain wiring, isolation tests | DONE
 `go/memory`: Executor (five tools over the per-user vault, every path
 re-checked against the vault boundary, index/log maintenance, v1 keyword
