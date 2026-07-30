@@ -5,6 +5,13 @@ bottom.
 
 ## Watching (not blocking)
 
+- **No MCP server package in agentware yet.** `business/SDK_PLAN.md`
+  specifies an `mcp/` package (stdio + HTTP transports) that doesn't exist;
+  memory tools are currently exposed via `tools.ToolRegistry` and
+  `WikiMemory.RegisterTools`. The SDK-facing MCP exposure lands with the
+  Python/TS client phases; if the mcp package is still absent then, build
+  the minimal server as part of that work rather than forking the plan.
+
 - **ontology-go PR #18 pending merge.**
   `validate.checkInconsistentHierarchy` had an inverted direction check
   (flagged consistent inverse pairs, missed real broader+narrower

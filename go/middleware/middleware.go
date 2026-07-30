@@ -90,3 +90,10 @@ const callerContextKey contextKey = "caller_context"
 func WithCallerContext(ctx context.Context, caller CallerContext) context.Context {
 	return context.WithValue(ctx, callerContextKey, caller)
 }
+
+// CallerFromContext returns the CallerContext attached to ctx, if any.
+// Downstream executors use this to scope work to the calling user.
+func CallerFromContext(ctx context.Context) (CallerContext, bool) {
+	c, ok := ctx.Value(callerContextKey).(CallerContext)
+	return c, ok
+}

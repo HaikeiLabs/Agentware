@@ -15,8 +15,10 @@ func Tools() []string {
 	return []string{ToolIngest, ToolWritePage, ToolQuery, ToolGetClaims, ToolLint}
 }
 
-// writeTools are the tools whose args carry page content subject to
-// semantic (ontology) validation.
-func isWriteTool(name string) bool {
-	return name == ToolIngest || name == ToolWritePage
+// isSemanticWrite reports whether a tool's args carry wiki-page content
+// subject to ontology validation. memory_ingest stores raw source text
+// verbatim, so only page writes get the semantic tier; both pass the
+// declarative tier and are audited.
+func isSemanticWrite(name string) bool {
+	return name == ToolWritePage
 }
