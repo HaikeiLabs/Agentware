@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soypete.tech/pedro-agentware/memory/infer/schema.json",
+  "title": "Wiki-memory Markov link network inference contract",
+  "description": "One contract for both transports (subprocess stdin/stdout today, MCP tool call later). The Go core sends a request built from a user's vault (claim nodes from claims[].id, source nodes from raw/ ids, typed edges); the Python engine (pedro_agentware.memory.infer, pgmpy) replies with per-claim marginals and contested flags. Confidence is written back into claim frontmatter through the enforced write path.",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "kind": { "enum": ["claim", "source"] },
+              "reliability": {
+                "type": "number", "minimum": 0, "maximum": 1,
+                "description": "Source prior override; defaults to weights.sourcePrior, or weights.supersededPrior when superseded."
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "source", "target"],
+            "additionalProperties": false,
+            "properties": {
+              "type": { "enum": ["supports", "contradicts", "sourceOf", "supersedes"] },
+              "source": { "type": "string" },
+              "target": { "type": "string" }
+            }
+          }
+        },
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "supports": { "type": "number", "default": 0.8 },
+            "contradicts": { "type": "number", "default": 0.9 },
+            "sourceOf": { "type": "number", "default": 0.85 },
+            "sourcePrior": { "type": "number", "default": 0.7 },
+            "supersededPrior": { "type": "number", "default": 0.4 },
+            "contestedThreshold": { "type": "number", "default": 0.6 }
+          }
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "required": ["marginals", "contested", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "marginals": {
+          "type": "object",
+          "description": "Per-claim P(true). Source nodes are omitted.",
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "contested": {
+          "type": "object",
+          "description": "True when the claim has a contradicts edge to a claim whose marginal exceeds contestedThreshold.",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "method": { "enum": ["belief_propagation", "gibbs"] }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["error"],
+      "properties": { "error": { "type": "string" } }
+    }
+  }
+}
