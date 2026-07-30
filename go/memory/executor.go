@@ -164,12 +164,14 @@ func (x *Executor) getClaims(userID string, args map[string]any) (*tools.Result,
 		return nil, err
 	}
 	type claimOut struct {
-		Page       string   `json:"page"`
-		ID         string   `json:"id"`
-		Text       string   `json:"text"`
-		Sources    []string `json:"sources,omitempty"`
-		Confidence *float64 `json:"confidence"`
-		Contested  bool     `json:"contested,omitempty"`
+		Page        string   `json:"page"`
+		ID          string   `json:"id"`
+		Text        string   `json:"text"`
+		Sources     []string `json:"sources,omitempty"`
+		Supports    []string `json:"supports,omitempty"`
+		Contradicts []string `json:"contradicts,omitempty"`
+		Confidence  *float64 `json:"confidence"`
+		Contested   bool     `json:"contested,omitempty"`
 	}
 	out := []claimOut{}
 	for _, p := range pages {
@@ -178,7 +180,8 @@ func (x *Executor) getClaims(userID string, args map[string]any) (*tools.Result,
 		}
 		for _, c := range p.Claims {
 			out = append(out, claimOut{Page: p.ID, ID: c.ID, Text: c.Text,
-				Sources: c.Sources, Confidence: c.Confidence, Contested: c.Contested})
+				Sources: c.Sources, Supports: c.Supports, Contradicts: c.Contradicts,
+				Confidence: c.Confidence, Contested: c.Contested})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {

@@ -31,13 +31,17 @@ type Link struct {
 	Target string `yaml:"target"`
 }
 
-// Claim is an atomic assertion tracked by the inference layer.
+// Claim is an atomic assertion tracked by the inference layer. Supports
+// and Contradicts reference other claims: "c2" within the same page or
+// "other-page#c1" across pages.
 type Claim struct {
-	ID         string   `yaml:"id"`
-	Text       string   `yaml:"text"`
-	Sources    []string `yaml:"sources"`
-	Confidence *float64 `yaml:"confidence"`
-	Contested  bool     `yaml:"contested"`
+	ID          string   `yaml:"id"`
+	Text        string   `yaml:"text"`
+	Sources     []string `yaml:"sources"`
+	Supports    []string `yaml:"supports"`
+	Contradicts []string `yaml:"contradicts"`
+	Confidence  *float64 `yaml:"confidence"`
+	Contested   bool     `yaml:"contested"`
 }
 
 // Frontmatter is the typed header of a wiki page (see SCHEMA.md).
@@ -81,6 +85,7 @@ var (
 	pageIDPattern    = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	curiePattern     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*:[A-Za-z0-9_-]+$`)
 	wikilinkPattern  = regexp.MustCompile(`\[\[([a-z0-9-]+)(?:\|pred=([A-Za-z][A-Za-z0-9]*:[A-Za-z0-9_-]+))?\]\]`)
+	claimRefPattern  = regexp.MustCompile(`^([a-z0-9]+(-[a-z0-9]+)*#)?[A-Za-z0-9_-]+$`)
 )
 
 // Parse parses raw page bytes. It enforces the structural contract (required
@@ -141,6 +146,11 @@ func (p *Page) checkContract() error {
 			return fmt.Errorf("%w: duplicate claim id %q", ErrContract, c.ID)
 		}
 		claimIDs[c.ID] = true
+		for _, ref := range append(append([]string{}, c.Supports...), c.Contradicts...) {
+			if !claimRefPattern.MatchString(ref) {
+				return fmt.Errorf("%w: claim ref %q (want \"c2\" or \"page-id#c2\")", ErrContract, ref)
+			}
+		}
 	}
 	return nil
 }
