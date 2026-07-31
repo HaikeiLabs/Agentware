@@ -7,6 +7,51 @@
  * middleware chain (declarative policy + ontology evaluator + audit), and
  * in-band attempts to change user scope are denied. The API is async
  * (subprocess I/O); inference stays in the Python SDK.
+ *
+ * ## Providing Your Own Ontology
+ *
+ * The T-box (schema) is fully composable — pass paths to your own TTL files.
+ * Multiple files are merged. Use absolute paths or paths relative to your
+ * working directory.
+ *
+ * Example TTL file (my-ontology.ttl):
+ * ```turtle
+ * @prefix ex: <http://example.org/> .
+ * @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+ * @prefix owl: <http://www.w3.org/2002/07/owl#> .
+ *
+ * ex:Project a owl:Class ;
+ *     rdfs:label "Project"@en ;
+ *     rdfs:comment "A software project" .
+ *
+ * ex:Task a owl:Class ;
+ *     rdfs:label "Task"@en ;
+ *     rdfs:subClassOf ex:Project .
+ *
+ * ex:hasStatus a owl:ObjectProperty ;
+ *     rdfs:domain ex:Project ;
+ *     rdfs:range ex:Status .
+ *
+ * ex:Status a owl:Class ;
+ *     rdfs:label "Status"@en .
+ * ```
+ *
+ * Example usage:
+ * ```typescript
+ * const wiki = new WikiMemory({
+ *   userId: "alice",
+ *   root: "./memory",
+ *   tboxPaths: [
+ *     "./my-ontology.ttl",    // your custom ontology
+ *     "./shared-skills.ttl",  // another TTL file
+ *   ],
+ * });
+ * ```
+ *
+ * The repo includes example ontologies in `ontologies/`:
+ * - `ontologies/education/TBOX_LEARNING_SOFTWARE.ttl` (learning software concepts)
+ * - `ontologies/social/twitch_topics.ttl` (SKOS concepts)
+ * - `ontologies/thesaurus/*.ttl` (SKOS testing)
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
