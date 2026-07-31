@@ -10,12 +10,54 @@ import (
 )
 
 // Config configures the composable wiki-memory component.
+//
+// # TBoxPaths - Providing Your Own Ontology
+//
+// The T-box (schema) is fully composable — pass paths to your own TTL files.
+// Multiple files are merged. Use absolute paths or paths relative to your
+// working directory.
+//
+// Example TTL file (my-ontology.ttl):
+//
+//	@prefix ex: <http://example.org/> .
+//	@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+//	@prefix owl: <http://www.w3.org/2002/07/owl#> .
+//
+//	ex:Project a owl:Class ;
+//	    rdfs:label "Project"@en ;
+//	    rdfs:comment "A software project" .
+//
+//	ex:Task a owl:Class ;
+//	    rdfs:label "Task"@en ;
+//	    rdfs:subClassOf ex:Project .
+//
+//	ex:hasStatus a owl:ObjectProperty ;
+//	    rdfs:domain ex:Project ;
+//	    rdfs:range ex:Status .
+//
+//	ex:Status a owl:Class ;
+//	    rdfs:label "Status"@en .
+//
+// Example usage:
+//
+//	wiki, err := memory.Enable(memory.Config{
+//	    Root: "./memory",
+//	    TBoxPaths: []string{
+//	        "./my-ontology.ttl",           // your custom ontology
+//	        "./shared-skills.ttl",         // another TTL file
+//	    },
+//	})
+//
+// The repo includes example ontologies in ontologies/:
+//   - ontologies/education/TBOX_LEARNING_SOFTWARE.ttl (learning software concepts)
+//   - ontologies/social/twitch_topics.ttl (SKOS concepts)
+//   - ontologies/thesaurus/*.ttl (SKOS testing)
 type Config struct {
 	// Root is the memory root directory (one vault per user beneath it).
 	Root string
-	// TBoxPaths are Turtle files forming the read-only T-box. Defaults to
-	// the ontologies/ submodule paths when empty relative to the repo; there
-	// is no implicit default outside it — users point at their own T-box.
+	// TBoxPaths are Turtle files forming the read-only T-box.
+	// Pass paths to your own .ttl files — multiple files are merged.
+	// Required: no default is provided; the T-box is a parameter.
 	TBoxPaths []string
 	// Prefixes overrides the CURIE prefix map (SCHEMA.md defaults).
 	Prefixes map[string]string

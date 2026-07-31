@@ -66,6 +66,49 @@ class WikiMemory:
         memory = WikiMemory(user_id="alice", root="/var/memory",
                             tbox_paths=[...])
         mw = MiddlewareImpl(executor=memory).with_auditor(auditor)
+
+    # Providing Your Own Ontology
+
+    The T-box (schema) is fully composable — pass paths to your own TTL files.
+    Multiple files are merged. Use absolute paths or paths relative to your
+    working directory.
+
+    Example TTL file (my-ontology.ttl)::
+
+        @prefix ex: <http://example.org/> .
+        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+        @prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+        ex:Project a owl:Class ;
+            rdfs:label "Project"@en ;
+            rdfs:comment "A software project" .
+
+        ex:Task a owl:Class ;
+            rdfs:label "Task"@en ;
+            rdfs:subClassOf ex:Project .
+
+        ex:hasStatus a owl:ObjectProperty ;
+            rdfs:domain ex:Project ;
+            rdfs:range ex:Status .
+
+        ex:Status a owl:Class ;
+            rdfs:label "Status"@en .
+
+    Example usage::
+
+        wiki = WikiMemory(
+            user_id="alice",
+            root="./memory",
+            tbox_paths=[
+                "./my-ontology.ttl",    # your custom ontology
+                "./shared-skills.ttl",  # another TTL file
+            ],
+        )
+
+    The repo includes example ontologies in ``ontologies/``:
+        - ontologies/education/TBOX_LEARNING_SOFTWARE.ttl (learning software concepts)
+        - ontologies/social/twitch_topics.ttl (SKOS concepts)
+        - ontologies/thesaurus/*.ttl (SKOS testing)
     """
 
     def __init__(
@@ -113,9 +156,7 @@ class WikiMemory:
 
     def _request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         self._next_id += 1
-        self._send(
-            {"jsonrpc": "2.0", "id": self._next_id, "method": method, "params": params}
-        )
+        self._send({"jsonrpc": "2.0", "id": self._next_id, "method": method, "params": params})
         stdout = self._proc.stdout
         if stdout is None:
             raise MemoryServerError("server stdout closed")
