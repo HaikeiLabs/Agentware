@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"time"
 
 	"github.com/soypete/pedro-agentware/go/tools"
 )
@@ -39,10 +40,12 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 	}
 
 	auditRecord := AuditRecord{
-		SessionID: caller.SessionID,
-		ToolName:  toolName,
-		Args:      args,
-		Decision:  decision,
+		InvokedAt:       time.Now(),
+		InvokingSubject: caller.UserID,
+		ParentSpan:      caller.SessionID,
+		ToolName:        toolName,
+		Decision:        string(decision.Action),
+		PolicyID:        decision.Rule,
 	}
 	if m.auditor != nil {
 		m.auditor.Record(auditRecord)

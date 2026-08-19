@@ -7,12 +7,15 @@ import (
 
 func TestCallerContext(t *testing.T) {
 	ctx := CallerContext{
-		UserID:    "user123",
-		SessionID: "session456",
-		Role:      "admin",
-		Source:    "cli",
-		Trusted:   true,
-		Metadata:  map[string]string{"key": "value"},
+		UserID:          "user123",
+		SessionID:       "session456",
+		Role:            "admin",
+		Source:          "cli",
+		Trusted:         true,
+		Metadata:        map[string]string{"key": "value"},
+		InvokingSubject: "agent:orchestrator",
+		ParentSpan:      "span-123",
+		DelegationDepth: 2,
 	}
 
 	if ctx.UserID != "user123" {
@@ -20,6 +23,15 @@ func TestCallerContext(t *testing.T) {
 	}
 	if ctx.Trusted != true {
 		t.Error("expected Trusted to be true")
+	}
+	if ctx.InvokingSubject != "agent:orchestrator" {
+		t.Errorf("expected InvokingSubject 'agent:orchestrator', got '%s'", ctx.InvokingSubject)
+	}
+	if ctx.ParentSpan != "span-123" {
+		t.Errorf("expected ParentSpan 'span-123', got '%s'", ctx.ParentSpan)
+	}
+	if ctx.DelegationDepth != 2 {
+		t.Errorf("expected DelegationDepth 2, got %d", ctx.DelegationDepth)
 	}
 }
 
