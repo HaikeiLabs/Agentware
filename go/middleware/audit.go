@@ -22,6 +22,7 @@ type AuditRecord struct {
 	CachedTokens     int
 	LatencyMs        int
 	Error            string
+	Success          bool
 	RetryCount       int
 }
 

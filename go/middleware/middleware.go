@@ -55,11 +55,14 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		Decision:        string(decision.Action),
 		PolicyID:        decision.Rule,
 	}
-	if m.auditor != nil {
-		m.auditor.Record(auditRecord)
-	}
 
 	if decision.Action == ActionDeny {
+		auditRecord.LatencyMs = 0
+		auditRecord.Error = "denied by policy: " + decision.Reason
+		auditRecord.Success = false
+		if m.auditor != nil {
+			m.auditor.Record(auditRecord)
+		}
 		return &tools.Result{
 			Success: false,
 			Error:   "denied by policy: " + decision.Reason,
@@ -72,7 +75,27 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		}
 	}
 
-	return m.exec.Execute(ctx, toolName, args)
+	start := time.Now()
+	result, err := m.exec.Execute(ctx, toolName, args)
+	auditRecord.LatencyMs = int(time.Since(start).Milliseconds())
+	if err != nil {
+		auditRecord.Error = err.Error()
+		auditRecord.Success = false
+	} else if result != nil {
+		auditRecord.Success = result.Success
+		if !result.Success && result.Error != "" {
+			auditRecord.Error = result.Error
+		}
+	} else {
+		auditRecord.Success = false
+		auditRecord.Error = "nil result with no error"
+	}
+
+	if m.auditor != nil {
+		m.auditor.Record(auditRecord)
+	}
+
+	return result, err
 }
 
 func (m *middlewareImpl) WithPolicy(evaluator PolicyEvaluator) Middleware {
