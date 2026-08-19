@@ -11,7 +11,7 @@ func TestCallerContext(t *testing.T) {
 		SessionID:       "session456",
 		Role:            "admin",
 		Source:          "cli",
-		Trusted:         true,
+		Trusted:         true, // explicitly set, should return same
 		Metadata:        map[string]string{"key": "value"},
 		InvokingSubject: "agent:orchestrator",
 		ParentSpan:      "span-123",
