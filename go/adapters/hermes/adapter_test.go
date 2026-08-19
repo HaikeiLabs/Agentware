@@ -602,7 +602,10 @@ func TestWithCallerContext(t *testing.T) {
 	}
 
 	resultCtx := WithCallerContext(ctx, callerCtx)
-	result := resultCtx.Value(hermesCallerKey).(middleware.CallerContext)
+	result, ok := middleware.CallerFromContext(resultCtx)
+	if !ok {
+		t.Fatal("expected caller context to be present")
+	}
 
 	if result.Trusted != true {
 		t.Error("expected trusted to be true")

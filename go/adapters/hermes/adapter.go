@@ -266,7 +266,7 @@ func (a *HermesMiddlewareAdapter) GetAuditor() middleware.Auditor {
 }
 
 func getCallerContext(ctx context.Context) middleware.CallerContext {
-	if c, ok := ctx.Value(hermesCallerKey).(middleware.CallerContext); ok {
+	if c, ok := middleware.CallerFromContext(ctx); ok {
 		return c
 	}
 	return middleware.CallerContext{
@@ -274,10 +274,6 @@ func getCallerContext(ctx context.Context) middleware.CallerContext {
 	}
 }
 
-type hermesCallerContextKey string
-
-const hermesCallerKey hermesCallerContextKey = "hermes_caller_context"
-
 func WithCallerContext(ctx context.Context, caller middleware.CallerContext) context.Context {
-	return context.WithValue(ctx, hermesCallerKey, caller)
+	return middleware.WithCallerContext(ctx, caller)
 }
