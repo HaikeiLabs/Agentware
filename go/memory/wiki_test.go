@@ -85,10 +85,10 @@ func TestChainDenyCarriesDiagnosticsAndIsAudited(t *testing.T) {
 	if len(denies) != 1 {
 		t.Fatalf("expected 1 audited deny, got %d", len(denies))
 	}
-	if denies[0].ToolName != ToolWritePage || denies[0].SessionID != "sess-alice" {
+	if denies[0].ToolName != ToolWritePage || denies[0].InvokingSubject != "sess-alice" {
 		t.Errorf("audit record mismatch: %+v", denies[0])
 	}
-	if _, ok := ParseDiagnostics(denies[0].Decision.Reason); !ok {
+	if _, ok := ParseDiagnostics(denies[0].Error); !ok {
 		t.Error("audited deny must carry the diagnostics payload")
 	}
 }
