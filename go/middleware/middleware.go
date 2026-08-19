@@ -2,6 +2,9 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	"github.com/soypete/pedro-agentware/go/tools"
@@ -39,11 +42,16 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		decision = Decision{Action: ActionAllow, Reason: "no policy configured"}
 	}
 
+	argsBytes, _ := json.Marshal(args)
+	argsHash := sha256.Sum256(argsBytes)
+	argsDigest := hex.EncodeToString(argsHash[:])
+
 	auditRecord := AuditRecord{
 		InvokedAt:       time.Now(),
 		InvokingSubject: caller.UserID,
 		ParentSpan:      caller.SessionID,
 		ToolName:        toolName,
+		ToolArgsDigest:  argsDigest,
 		Decision:        string(decision.Action),
 		PolicyID:        decision.Rule,
 	}
