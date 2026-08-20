@@ -148,6 +148,31 @@ func TestMiddlewareAuditorRecords(t *testing.T) {
 	}
 }
 
+func TestMiddlewareAuditorRecordsDelegationChain(t *testing.T) {
+	auditor := &mockAuditor{}
+	mw := NewMiddleware(&mockExecutor{}).WithAuditor(auditor)
+	ctx := WithCallerContext(context.Background(), CallerContext{
+		UserID:          "user-123",
+		InvokingSubject: "agent:planner",
+		DelegationDepth: 3,
+	})
+
+	if _, err := mw.Execute(ctx, "my_tool", map[string]any{}); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if len(auditor.records) != 1 {
+		t.Fatalf("expected 1 audit record, got %d", len(auditor.records))
+	}
+	record := auditor.records[0]
+	if record.InvokingSubject != "agent:planner" {
+		t.Errorf("expected invoking subject %q, got %q", "agent:planner", record.InvokingSubject)
+	}
+	if record.DelegationDepth != 3 {
+		t.Errorf("expected delegation depth 3, got %d", record.DelegationDepth)
+	}
+}
+
 func TestMiddlewareAuditorRecordsFramework(t *testing.T) {
 	auditor := &mockAuditor{}
 	mw := NewMiddleware(&mockExecutor{}).WithAuditor(auditor)
