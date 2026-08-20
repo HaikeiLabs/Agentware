@@ -149,6 +149,25 @@ func TestExecute(t *testing.T) {
 	}
 }
 
+func TestExecute_StampsADKFramework(t *testing.T) {
+	auditor := &mockAuditor{}
+	m := middleware.NewMiddleware(&mockExecutor{}).WithAuditor(auditor)
+	adapter := NewAdapter(m)
+
+	if _, err := adapter.Execute(context.Background(), "test_tool", map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(auditor.records) == 0 {
+		t.Fatal("expected at least one audit record")
+	}
+	for _, record := range auditor.records {
+		if record.Framework != "adk" {
+			t.Errorf("expected framework %q, got %q", "adk", record.Framework)
+		}
+	}
+}
+
 func TestExecute_DeniedByPolicy(t *testing.T) {
 	exec := &mockExecutor{}
 	policy := &mockPolicy{decision: middleware.Decision{Action: middleware.ActionDeny, Reason: "denied"}}
