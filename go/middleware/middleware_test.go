@@ -216,3 +216,111 @@ func TestWithCallerContext(t *testing.T) {
 		t.Errorf("expected UserID 'user123', got '%s'", c.UserID)
 	}
 }
+
+func TestExecute_CapturesTokenUsage(t *testing.T) {
+	auditor := &mockAuditor{}
+	mw := NewMiddleware(&mockExecutor{}).WithAuditor(auditor)
+
+	ctx := WithTokenUsage(context.Background(), TokenUsage{
+		PromptTokens:     100,
+		CompletionTokens: 20,
+		CachedTokens:     64,
+	})
+
+	if _, err := mw.Execute(ctx, "my_tool", map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(auditor.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(auditor.records))
+	}
+	rec := auditor.records[0]
+	if rec.TokensIn != 100 {
+		t.Errorf("expected TokensIn 100, got %d", rec.TokensIn)
+	}
+	if rec.TokensOut != 20 {
+		t.Errorf("expected TokensOut 20, got %d", rec.TokensOut)
+	}
+	if rec.CachedTokens != 64 {
+		t.Errorf("expected CachedTokens 64, got %d", rec.CachedTokens)
+	}
+}
+
+// A denied call still records the token usage of the inference turn that
+// produced it — the tokens were spent regardless of the policy decision.
+func TestExecute_CapturesTokenUsageOnDeny(t *testing.T) {
+	auditor := &mockAuditor{}
+	mw := NewMiddleware(&mockExecutor{}).
+		WithPolicy(&mockEvaluator{decision: Decision{Action: ActionDeny, Reason: "nope"}}).
+		WithAuditor(auditor)
+
+	ctx := WithTokenUsage(context.Background(), TokenUsage{
+		PromptTokens:     10,
+		CompletionTokens: 5,
+		CachedTokens:     8,
+	})
+
+	if _, err := mw.Execute(ctx, "my_tool", map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(auditor.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(auditor.records))
+	}
+	if got := auditor.records[0].CachedTokens; got != 8 {
+		t.Errorf("expected CachedTokens 8, got %d", got)
+	}
+	if got := auditor.records[0].TokensIn; got != 10 {
+		t.Errorf("expected TokensIn 10, got %d", got)
+	}
+}
+
+// Without usage in the context the record keeps zero counts rather than
+// carrying stale values from another turn.
+func TestExecute_NoTokenUsageInContext(t *testing.T) {
+	auditor := &mockAuditor{}
+	mw := NewMiddleware(&mockExecutor{}).WithAuditor(auditor)
+
+	if _, err := mw.Execute(context.Background(), "my_tool", map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(auditor.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(auditor.records))
+	}
+	rec := auditor.records[0]
+	if rec.TokensIn != 0 || rec.TokensOut != 0 || rec.CachedTokens != 0 {
+		t.Errorf("expected zero token counts, got in=%d out=%d cached=%d",
+			rec.TokensIn, rec.TokensOut, rec.CachedTokens)
+	}
+}
+
+func TestTokenUsageFromContext(t *testing.T) {
+	if _, ok := TokenUsageFromContext(context.Background()); ok {
+		t.Error("expected no usage in a bare context")
+	}
+
+	ctx := WithTokenUsage(context.Background(), TokenUsage{CachedTokens: 42})
+	usage, ok := TokenUsageFromContext(ctx)
+	if !ok {
+		t.Fatal("expected usage to be present")
+	}
+	if usage.CachedTokens != 42 {
+		t.Errorf("expected 42, got %d", usage.CachedTokens)
+	}
+}
+
+// The token-usage key must not collide with the caller-context key.
+func TestTokenUsage_DoesNotCollideWithCallerContext(t *testing.T) {
+	ctx := WithCallerContext(context.Background(), CallerContext{UserID: "u1"})
+	ctx = WithTokenUsage(ctx, TokenUsage{CachedTokens: 7})
+
+	caller, ok := CallerFromContext(ctx)
+	if !ok || caller.UserID != "u1" {
+		t.Errorf("caller context clobbered: ok=%v caller=%+v", ok, caller)
+	}
+	usage, ok := TokenUsageFromContext(ctx)
+	if !ok || usage.CachedTokens != 7 {
+		t.Errorf("usage clobbered: ok=%v usage=%+v", ok, usage)
+	}
+}
