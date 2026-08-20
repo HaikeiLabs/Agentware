@@ -49,7 +49,21 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		decision = Decision{Action: ActionAllow, Reason: "no policy configured"}
 	}
 
-	argsBytes, _ := json.Marshal(args)
+	// Apply redaction before hashing or executing so that neither the audit
+	// digest nor the tool ever observes the sensitive values. The caller's map
+	// is copied rather than mutated in place.
+	execArgs := args
+	if decision.Action == ActionFilter && len(decision.RedactedArgs) > 0 {
+		execArgs = make(map[string]any, len(args))
+		for k, v := range args {
+			execArgs[k] = v
+		}
+		for k, v := range decision.RedactedArgs {
+			execArgs[k] = v
+		}
+	}
+
+	argsBytes, _ := json.Marshal(execArgs)
 	argsHash := sha256.Sum256(argsBytes)
 	argsDigest := hex.EncodeToString(argsHash[:])
 
@@ -84,14 +98,8 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		}, nil
 	}
 
-	if decision.Action == ActionFilter && len(decision.RedactedArgs) > 0 {
-		for k, v := range decision.RedactedArgs {
-			args[k] = v
-		}
-	}
-
 	start := time.Now()
-	result, err := m.exec.Execute(ctx, toolName, args)
+	result, err := m.exec.Execute(ctx, toolName, execArgs)
 	auditRecord.LatencyMs = int(time.Since(start).Milliseconds())
 	if err != nil {
 		auditRecord.Error = err.Error()

@@ -185,3 +185,76 @@ func TestRateLimit(t *testing.T) {
 		t.Errorf("expected Window 1m, got %v", rl.Window)
 	}
 }
+
+func TestPolicyEvaluateFilterPopulatesRedactedArgs(t *testing.T) {
+	p := &Policy{
+		Rules: []Rule{
+			{
+				Name:         "redact_secrets",
+				Tools:        []string{"send_email"},
+				Action:       ActionFilter,
+				RedactFields: []string{"password", "api_key"},
+			},
+		},
+	}
+
+	args := map[string]any{
+		"password": "hunter2",
+		"api_key":  "sk-live-123",
+		"to":       "user@example.com",
+	}
+	decision := p.Evaluate("send_email", args, CallerContext{})
+
+	if decision.Action != ActionFilter {
+		t.Fatalf("expected filter action, got %q", decision.Action)
+	}
+	if len(decision.RedactedArgs) != 2 {
+		t.Fatalf("expected 2 redacted args, got %d: %v", len(decision.RedactedArgs), decision.RedactedArgs)
+	}
+	for _, field := range []string{"password", "api_key"} {
+		if decision.RedactedArgs[field] != RedactedPlaceholder {
+			t.Errorf("expected %s to be %q, got %v", field, RedactedPlaceholder, decision.RedactedArgs[field])
+		}
+	}
+	if _, ok := decision.RedactedArgs["to"]; ok {
+		t.Error("non-sensitive field 'to' should not be redacted")
+	}
+	if args["password"] != "hunter2" {
+		t.Error("Evaluate must not mutate the caller's args map")
+	}
+}
+
+func TestPolicyEvaluateRedactsOnlyPresentFields(t *testing.T) {
+	p := &Policy{
+		Rules: []Rule{{
+			Name:         "redact",
+			Tools:        []string{"*"},
+			Action:       ActionFilter,
+			RedactFields: []string{"password", "missing_field"},
+		}},
+	}
+
+	decision := p.Evaluate("any_tool", map[string]any{"password": "x"}, CallerContext{})
+	if len(decision.RedactedArgs) != 1 {
+		t.Fatalf("expected only present fields redacted, got %v", decision.RedactedArgs)
+	}
+	if _, ok := decision.RedactedArgs["missing_field"]; ok {
+		t.Error("absent field should not appear in RedactedArgs")
+	}
+}
+
+func TestPolicyEvaluateNonFilterRuleHasNoRedactedArgs(t *testing.T) {
+	p := &Policy{
+		Rules: []Rule{{
+			Name:         "allow_rule",
+			Tools:        []string{"*"},
+			Action:       ActionAllow,
+			RedactFields: []string{"password"},
+		}},
+	}
+
+	decision := p.Evaluate("any_tool", map[string]any{"password": "x"}, CallerContext{})
+	if len(decision.RedactedArgs) != 0 {
+		t.Errorf("allow rule should not populate RedactedArgs, got %v", decision.RedactedArgs)
+	}
+}

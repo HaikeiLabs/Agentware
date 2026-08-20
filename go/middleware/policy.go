@@ -53,10 +53,11 @@ func (p *Policy) Evaluate(toolName string, args map[string]any, caller CallerCon
 			continue
 		}
 		return Decision{
-			Action:    rule.Action,
-			Rule:      rule.Name,
-			Reason:    "matched rule " + rule.Name,
-			Timestamp: time.Now(),
+			Action:       rule.Action,
+			Rule:         rule.Name,
+			Reason:       "matched rule " + rule.Name,
+			RedactedArgs: rule.redactedArgs(args),
+			Timestamp:    time.Now(),
 		}
 	}
 
@@ -75,6 +76,27 @@ func (p *Policy) Evaluate(toolName string, args map[string]any, caller CallerCon
 		Reason:    "no matching rules and default allow is enabled",
 		Timestamp: time.Now(),
 	}
+}
+
+// redactedArgs returns the subset of args that the rule redacts, with each
+// configured field replaced by the redaction placeholder. It returns nil when
+// the rule is not a filter rule or when none of the redact fields are present,
+// so callers can use len(RedactedArgs) to detect whether redaction applies.
+func (r *Rule) redactedArgs(args map[string]any) map[string]any {
+	if r.Action != ActionFilter || len(r.RedactFields) == 0 {
+		return nil
+	}
+	var redacted map[string]any
+	for _, field := range r.RedactFields {
+		if _, ok := args[field]; !ok {
+			continue
+		}
+		if redacted == nil {
+			redacted = make(map[string]any, len(r.RedactFields))
+		}
+		redacted[field] = RedactedPlaceholder
+	}
+	return redacted
 }
 
 func (r *Rule) matchesTool(toolName string) bool {
