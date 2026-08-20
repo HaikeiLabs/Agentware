@@ -11,12 +11,15 @@ const (
 )
 
 type CallerContext struct {
-	UserID    string
-	SessionID string
-	Role      string
-	Source    string
-	Trusted   bool
-	Metadata  map[string]string
+	UserID          string
+	SessionID       string
+	Role            string
+	Source          string
+	Trusted         bool
+	Metadata        map[string]string
+	InvokingSubject string
+	ParentSpan      string
+	DelegationDepth int
 }
 
 type Decision struct {

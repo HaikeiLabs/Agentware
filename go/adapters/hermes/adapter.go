@@ -225,10 +225,12 @@ func (a *HermesMiddlewareAdapter) Execute(ctx context.Context, toolName string, 
 
 	if a.auditor != nil {
 		a.auditor.Record(middleware.AuditRecord{
-			SessionID: caller.SessionID,
-			ToolName:  toolName,
-			Args:      args,
-			Decision:  decision,
+			InvokedAt:       time.Now(),
+			InvokingSubject: caller.UserID,
+			ParentSpan:      caller.SessionID,
+			ToolName:        toolName,
+			Decision:        string(decision.Action),
+			PolicyID:        decision.Rule,
 		})
 	}
 

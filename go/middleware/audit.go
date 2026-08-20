@@ -3,11 +3,26 @@ package middleware
 import "time"
 
 type AuditRecord struct {
-	SessionID string
-	ToolName  string
-	Args      map[string]any
-	Decision  Decision
-	Timestamp time.Time
+	ID               string
+	InvokedAt        time.Time
+	InvokingSubject  string
+	ParentSpan       string
+	DelegationDepth  int
+	AgentID          string
+	AgentVersion     string
+	Framework        string
+	ToolName         string
+	ToolArgsDigest   string
+	ResourcesTouched []string
+	Decision         string
+	PolicyID         string
+	Model            string
+	TokensIn         int
+	TokensOut        int
+	CachedTokens     int
+	LatencyMs        int
+	Error            string
+	RetryCount       int
 }
 
 type Auditor interface {
@@ -40,16 +55,16 @@ func (a *InMemoryAuditor) Record(record AuditRecord) {
 func (a *InMemoryAuditor) Query(filter AuditFilter) []AuditRecord {
 	result := make([]AuditRecord, 0)
 	for _, r := range a.records {
-		if filter.SessionID != "" && r.SessionID != filter.SessionID {
+		if filter.SessionID != "" && r.ParentSpan != filter.SessionID {
 			continue
 		}
 		if filter.ToolName != "" && r.ToolName != filter.ToolName {
 			continue
 		}
-		if filter.Action != "" && r.Decision.Action != filter.Action {
+		if filter.Action != "" && r.Decision != string(filter.Action) {
 			continue
 		}
-		if !filter.Since.IsZero() && r.Timestamp.Before(filter.Since) {
+		if !filter.Since.IsZero() && r.InvokedAt.Before(filter.Since) {
 			continue
 		}
 		result = append(result, r)
