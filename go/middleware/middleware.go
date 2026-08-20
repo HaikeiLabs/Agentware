@@ -82,7 +82,7 @@ func getCallerContext(ctx context.Context) CallerContext {
 		return c
 	}
 	return CallerContext{
-		Trusted: true,
+		Trusted: false,
 	}
 }
 
