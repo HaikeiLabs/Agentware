@@ -75,3 +75,13 @@ func (a *InMemoryAuditor) Query(filter AuditFilter) []AuditRecord {
 	}
 	return result
 }
+
+// TokenUsage carries LLM token counts for the inference turn that produced a
+// tool call. The middleware wraps tool execution and never sees the LLM
+// response itself, so callers attach usage to the context with
+// WithTokenUsage before invoking Execute.
+type TokenUsage struct {
+	PromptTokens     int
+	CompletionTokens int
+	CachedTokens     int
+}

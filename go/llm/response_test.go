@@ -50,6 +50,7 @@ func TestTokenUsage(t *testing.T) {
 		PromptTokens:     100,
 		CompletionTokens: 50,
 		TotalTokens:      150,
+		CachedTokens:     80,
 	}
 
 	if usage.PromptTokens != 100 {
@@ -60,5 +61,18 @@ func TestTokenUsage(t *testing.T) {
 	}
 	if usage.TotalTokens != 150 {
 		t.Errorf("expected 150, got %d", usage.TotalTokens)
+	}
+	if usage.CachedTokens != 80 {
+		t.Errorf("expected 80, got %d", usage.CachedTokens)
+	}
+}
+
+// TestTokenUsage_CachedTokensDefaultsToZero documents that backends which do
+// not report cache usage leave CachedTokens at zero rather than guessing.
+func TestTokenUsage_CachedTokensDefaultsToZero(t *testing.T) {
+	usage := TokenUsage{PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150}
+
+	if usage.CachedTokens != 0 {
+		t.Errorf("expected 0, got %d", usage.CachedTokens)
 	}
 }

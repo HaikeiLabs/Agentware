@@ -228,6 +228,9 @@ func (h *Handler) buildResponse(resp llm.Response) map[string]any {
 			"prompt_tokens":     resp.UsageTokens.PromptTokens,
 			"completion_tokens": resp.UsageTokens.CompletionTokens,
 			"total_tokens":      resp.UsageTokens.TotalTokens,
+			"prompt_tokens_details": map[string]any{
+				"cached_tokens": resp.UsageTokens.CachedTokens,
+			},
 		},
 	}
 }
