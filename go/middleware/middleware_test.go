@@ -2,6 +2,9 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/soypete/pedro-agentware/go/tools"
@@ -339,5 +342,55 @@ func TestTokenUsage_DoesNotCollideWithCallerContext(t *testing.T) {
 	usage, ok := TokenUsageFromContext(ctx)
 	if !ok || usage.CachedTokens != 7 {
 		t.Errorf("usage clobbered: ok=%v usage=%+v", ok, usage)
+	}
+}
+
+// TestMiddlewareFilterEndToEnd exercises the real Policy evaluator (not a mock)
+// to confirm sensitive args are redacted before the tool runs, the caller's map
+// is left untouched, and the audit digest is taken over redacted values.
+func TestMiddlewareFilterEndToEnd(t *testing.T) {
+	var capturedArgs map[string]any
+	exec := &mockExecutor{
+		execFn: func(ctx context.Context, toolName string, args map[string]any) (*tools.Result, error) {
+			capturedArgs = args
+			return &tools.Result{Success: true}, nil
+		},
+	}
+	policy := &Policy{
+		Rules: []Rule{{
+			Name:         "redact_password",
+			Tools:        []string{"login"},
+			Action:       ActionFilter,
+			RedactFields: []string{"password"},
+		}},
+	}
+	aud := &mockAuditor{}
+	mw := NewMiddleware(exec).WithPolicy(policy).WithAuditor(aud)
+
+	callerArgs := map[string]any{"user": "alice", "password": "hunter2"}
+	if _, err := mw.Execute(context.Background(), "login", callerArgs); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedArgs["password"] != RedactedPlaceholder {
+		t.Errorf("tool received unredacted password: %v", capturedArgs["password"])
+	}
+	if capturedArgs["user"] != "alice" {
+		t.Errorf("non-sensitive arg altered: %v", capturedArgs["user"])
+	}
+	if callerArgs["password"] != "hunter2" {
+		t.Error("caller's args map must not be mutated")
+	}
+
+	// The audit digest must match the redacted args, not the original ones.
+	redacted := map[string]any{"user": "alice", "password": RedactedPlaceholder}
+	b, _ := json.Marshal(redacted)
+	sum := sha256.Sum256(b)
+	want := hex.EncodeToString(sum[:])
+	if len(aud.records) != 1 {
+		t.Fatalf("expected 1 audit record, got %d", len(aud.records))
+	}
+	if aud.records[0].ToolArgsDigest != want {
+		t.Error("audit digest was computed over unredacted args")
 	}
 }

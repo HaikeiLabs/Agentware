@@ -10,6 +10,9 @@ const (
 	ActionFilter Action = "filter"
 )
 
+// RedactedPlaceholder replaces the value of any argument redacted by a filter rule.
+const RedactedPlaceholder = "[REDACTED]"
+
 type CallerContext struct {
 	UserID          string
 	SessionID       string
