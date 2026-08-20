@@ -63,6 +63,12 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		PolicyID:        decision.Rule,
 	}
 
+	if usage, ok := TokenUsageFromContext(ctx); ok {
+		auditRecord.TokensIn = usage.PromptTokens
+		auditRecord.TokensOut = usage.CompletionTokens
+		auditRecord.CachedTokens = usage.CachedTokens
+	}
+
 	if decision.Action == ActionDeny {
 		auditRecord.LatencyMs = 0
 		auditRecord.Error = "denied by policy: " + decision.Reason
@@ -141,8 +147,22 @@ type contextKey string
 
 const callerContextKey contextKey = "caller_context"
 
+const tokenUsageKey contextKey = "token_usage"
+
 func WithCallerContext(ctx context.Context, caller CallerContext) context.Context {
 	return context.WithValue(ctx, callerContextKey, caller)
+}
+
+// WithTokenUsage attaches LLM token usage for the current inference turn to
+// ctx. The middleware records it on the AuditRecord after tool execution.
+func WithTokenUsage(ctx context.Context, usage TokenUsage) context.Context {
+	return context.WithValue(ctx, tokenUsageKey, usage)
+}
+
+// TokenUsageFromContext returns the TokenUsage attached to ctx, if any.
+func TokenUsageFromContext(ctx context.Context) (TokenUsage, bool) {
+	u, ok := ctx.Value(tokenUsageKey).(TokenUsage)
+	return u, ok
 }
 
 // CallerFromContext returns the CallerContext attached to ctx, if any.

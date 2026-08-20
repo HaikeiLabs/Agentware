@@ -20,4 +20,7 @@ type TokenUsage struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
+	// CachedTokens is the subset of PromptTokens served from the provider's
+	// prompt cache. Zero when the backend does not report cache usage.
+	CachedTokens int
 }

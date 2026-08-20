@@ -104,9 +104,12 @@ func (b *serverBackend) Complete(ctx context.Context, req *Request) (*Response, 
 			FinishReason string  `json:"finish_reason"`
 		} `json:"choices"`
 		Usage struct {
-			PromptTokens     int `json:"prompt_tokens"`
-			CompletionTokens int `json:"completion_tokens"`
-			TotalTokens      int `json:"total_tokens"`
+			PromptTokens        int `json:"prompt_tokens"`
+			CompletionTokens    int `json:"completion_tokens"`
+			TotalTokens         int `json:"total_tokens"`
+			PromptTokensDetails struct {
+				CachedTokens int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
 		} `json:"usage"`
 	}
 
@@ -135,6 +138,7 @@ func (b *serverBackend) Complete(ctx context.Context, req *Request) (*Response, 
 			PromptTokens:     result.Usage.PromptTokens,
 			CompletionTokens: result.Usage.CompletionTokens,
 			TotalTokens:      result.Usage.TotalTokens,
+			CachedTokens:     result.Usage.PromptTokensDetails.CachedTokens,
 		},
 	}, nil
 }
