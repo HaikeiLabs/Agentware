@@ -57,6 +57,7 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		InvokedAt:       time.Now(),
 		InvokingSubject: caller.UserID,
 		ParentSpan:      caller.SessionID,
+		Framework:       FrameworkFromContext(ctx),
 		ToolName:        toolName,
 		ToolArgsDigest:  argsDigest,
 		Decision:        string(decision.Action),
@@ -149,6 +150,8 @@ const callerContextKey contextKey = "caller_context"
 
 const tokenUsageKey contextKey = "token_usage"
 
+const frameworkKey contextKey = "framework"
+
 func WithCallerContext(ctx context.Context, caller CallerContext) context.Context {
 	return context.WithValue(ctx, callerContextKey, caller)
 }
@@ -163,6 +166,17 @@ func WithTokenUsage(ctx context.Context, usage TokenUsage) context.Context {
 func TokenUsageFromContext(ctx context.Context) (TokenUsage, bool) {
 	u, ok := ctx.Value(tokenUsageKey).(TokenUsage)
 	return u, ok
+}
+
+// WithFramework attaches the calling agent framework identifier to ctx.
+func WithFramework(ctx context.Context, framework string) context.Context {
+	return context.WithValue(ctx, frameworkKey, framework)
+}
+
+// FrameworkFromContext returns the calling agent framework identifier, if any.
+func FrameworkFromContext(ctx context.Context) string {
+	framework, _ := ctx.Value(frameworkKey).(string)
+	return framework
 }
 
 // CallerFromContext returns the CallerContext attached to ctx, if any.

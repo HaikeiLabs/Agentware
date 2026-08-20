@@ -44,6 +44,7 @@ func (a *ADKToolAdapter) BeforeToolCallback(toolName string, args map[string]any
 			Trusted: true,
 		}
 		ctx := middleware.WithCallerContext(context.Background(), caller)
+		ctx = middleware.WithFramework(ctx, "adk")
 		_, err := a.middleware.Execute(ctx, toolName, args)
 		if err != nil {
 			return err
@@ -59,6 +60,8 @@ func (a *ADKToolAdapter) AfterToolCallback(toolName string, args map[string]any,
 }
 
 func (a *ADKToolAdapter) Execute(ctx context.Context, toolName string, args map[string]any) (*tools.Result, error) {
+	ctx = middleware.WithFramework(ctx, "adk")
+
 	if err := a.BeforeToolCallback(toolName, args); err != nil {
 		return &tools.Result{
 			Success: false,
@@ -143,6 +146,7 @@ func NewAuditAdapter(m middleware.Middleware, auditor middleware.Auditor) *ADKTo
 			auditor.Record(middleware.AuditRecord{
 				InvokedAt:       time.Now(),
 				InvokingSubject: caller.InvokingSubject,
+				Framework:       "adk",
 				ToolName:        toolName,
 				Success:         result.Success,
 				Error:           result.Error,

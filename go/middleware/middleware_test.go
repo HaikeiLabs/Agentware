@@ -145,6 +145,23 @@ func TestMiddlewareAuditorRecords(t *testing.T) {
 	}
 }
 
+func TestMiddlewareAuditorRecordsFramework(t *testing.T) {
+	auditor := &mockAuditor{}
+	mw := NewMiddleware(&mockExecutor{}).WithAuditor(auditor)
+	ctx := WithFramework(context.Background(), "custom-framework")
+
+	if _, err := mw.Execute(ctx, "my_tool", map[string]any{}); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if len(auditor.records) != 1 {
+		t.Fatalf("expected 1 audit record, got %d", len(auditor.records))
+	}
+	if got := auditor.records[0].Framework; got != "custom-framework" {
+		t.Errorf("expected framework %q, got %q", "custom-framework", got)
+	}
+}
+
 func TestMiddlewareAuditHooksRunAfterAuditRecording(t *testing.T) {
 	exec := &mockExecutor{}
 	eval := &mockEvaluator{decision: Decision{Action: ActionAllow, Rule: "test"}}
