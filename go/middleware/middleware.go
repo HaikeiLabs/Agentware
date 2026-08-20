@@ -69,8 +69,9 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 
 	auditRecord := AuditRecord{
 		InvokedAt:       time.Now(),
-		InvokingSubject: caller.UserID,
+		InvokingSubject: caller.InvokingSubject,
 		ParentSpan:      caller.SessionID,
+		DelegationDepth: caller.DelegationDepth,
 		Framework:       FrameworkFromContext(ctx),
 		ToolName:        toolName,
 		ToolArgsDigest:  argsDigest,
