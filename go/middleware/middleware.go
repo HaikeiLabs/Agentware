@@ -14,16 +14,23 @@ type ToolExecutor interface {
 	Execute(ctx context.Context, toolName string, args map[string]any) (*tools.Result, error)
 }
 
+// AuditHook receives completed audit records after they have been recorded.
+type AuditHook interface {
+	AfterExecution(record AuditRecord)
+}
+
 type Middleware interface {
 	ToolExecutor
 	WithPolicy(evaluator PolicyEvaluator) Middleware
 	WithAuditor(auditor Auditor) Middleware
+	AddHook(hook AuditHook) Middleware
 }
 
 type middlewareImpl struct {
 	exec      ToolExecutor
 	evaluator PolicyEvaluator
 	auditor   Auditor
+	hooks     []AuditHook
 }
 
 func NewMiddleware(exec ToolExecutor) Middleware {
@@ -63,6 +70,7 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 		if m.auditor != nil {
 			m.auditor.Record(auditRecord)
 		}
+		m.runHooks(auditRecord)
 		return &tools.Result{
 			Success: false,
 			Error:   "denied by policy: " + decision.Reason,
@@ -94,6 +102,7 @@ func (m *middlewareImpl) Execute(ctx context.Context, toolName string, args map[
 	if m.auditor != nil {
 		m.auditor.Record(auditRecord)
 	}
+	m.runHooks(auditRecord)
 
 	return result, err
 }
@@ -106,6 +115,17 @@ func (m *middlewareImpl) WithPolicy(evaluator PolicyEvaluator) Middleware {
 func (m *middlewareImpl) WithAuditor(auditor Auditor) Middleware {
 	m.auditor = auditor
 	return m
+}
+
+func (m *middlewareImpl) AddHook(hook AuditHook) Middleware {
+	m.hooks = append(m.hooks, hook)
+	return m
+}
+
+func (m *middlewareImpl) runHooks(record AuditRecord) {
+	for _, hook := range m.hooks {
+		hook.AfterExecution(record)
+	}
 }
 
 func getCallerContext(ctx context.Context) CallerContext {

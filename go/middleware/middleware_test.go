@@ -27,11 +27,27 @@ func (m *mockEvaluator) Evaluate(toolName string, args map[string]any, caller Ca
 }
 
 type mockAuditor struct {
-	records []AuditRecord
+	records  []AuditRecord
+	onRecord func()
 }
 
 func (m *mockAuditor) Record(record AuditRecord) {
 	m.records = append(m.records, record)
+	if m.onRecord != nil {
+		m.onRecord()
+	}
+}
+
+type mockAuditHook struct {
+	records          []AuditRecord
+	onAfterExecution func()
+}
+
+func (m *mockAuditHook) AfterExecution(record AuditRecord) {
+	m.records = append(m.records, record)
+	if m.onAfterExecution != nil {
+		m.onAfterExecution()
+	}
 }
 
 func (m *mockAuditor) Query(filter AuditFilter) []AuditRecord {
@@ -126,6 +142,62 @@ func TestMiddlewareAuditorRecords(t *testing.T) {
 	}
 	if aud.records[0].ToolName != "my_tool" {
 		t.Errorf("expected tool name 'my_tool', got '%s'", aud.records[0].ToolName)
+	}
+}
+
+func TestMiddlewareAuditHooksRunAfterAuditRecording(t *testing.T) {
+	exec := &mockExecutor{}
+	eval := &mockEvaluator{decision: Decision{Action: ActionAllow, Rule: "test"}}
+	order := make([]string, 0, 3)
+	aud := &mockAuditor{onRecord: func() { order = append(order, "audit") }}
+	firstHook := &mockAuditHook{onAfterExecution: func() { order = append(order, "first") }}
+	secondHook := &mockAuditHook{onAfterExecution: func() { order = append(order, "second") }}
+
+	mw := NewMiddleware(exec).
+		WithPolicy(eval).
+		WithAuditor(aud).
+		AddHook(firstHook).
+		AddHook(secondHook)
+
+	_, err := mw.Execute(context.Background(), "my_tool", map[string]any{})
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	expectedOrder := []string{"audit", "first", "second"}
+	if len(order) != len(expectedOrder) {
+		t.Fatalf("expected %d calls, got %d: %v", len(expectedOrder), len(order), order)
+	}
+	for i, expected := range expectedOrder {
+		if order[i] != expected {
+			t.Fatalf("expected call %d to be %q, got %q", i, expected, order[i])
+		}
+	}
+	if len(firstHook.records) != 1 || firstHook.records[0].ToolName != "my_tool" {
+		t.Fatalf("expected first hook to receive the audit record, got %#v", firstHook.records)
+	}
+	if len(secondHook.records) != 1 || secondHook.records[0].ToolName != "my_tool" {
+		t.Fatalf("expected second hook to receive the audit record, got %#v", secondHook.records)
+	}
+}
+
+func TestMiddlewareAuditHooksRunForDeniedExecution(t *testing.T) {
+	exec := &mockExecutor{}
+	eval := &mockEvaluator{decision: Decision{Action: ActionDeny, Reason: "not allowed"}}
+	hook := &mockAuditHook{}
+
+	mw := NewMiddleware(exec).WithPolicy(eval).AddHook(hook)
+
+	_, err := mw.Execute(context.Background(), "denied_tool", map[string]any{})
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if len(hook.records) != 1 {
+		t.Fatalf("expected hook to receive 1 audit record, got %d", len(hook.records))
+	}
+	if hook.records[0].Success {
+		t.Error("expected denied audit record to be unsuccessful")
 	}
 }
 
