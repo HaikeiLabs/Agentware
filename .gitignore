@@ -1,6 +1,6 @@
 .coverage
 .pytest_cache/
-.ruff_cache/
+.ruff_cache
 .venv/
 node_modules/
 dist/
@@ -14,3 +14,5 @@ testing/evals/output/
 .opencode/
 go/pedro-proxy
 go/example
+go/python/
+typescript/python/
