@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "kei_api_url": "https://kei.example.com/api/v1",
+  "harness_id": "test-harness-002",
+  "workspace_id": "ws-test-workspace",
+  "harness_type": {
+    "slug": "agent-tool-proxy",
+    "version": "1.0.0"
+  },
+  "environment": "test",
+  "installation_id": "inst-12346",
+  "config_revision": "def456abc",
+  "tool_bindings": [],
+  "secret_refs": {
+    "KEI_HARNESS_TOKEN": {
+      "source": "env",
+      "key": "KEI_HARNESS_TOKEN"
+    }
+  }
+}
