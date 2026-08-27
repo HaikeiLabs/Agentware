@@ -1,0 +1,12 @@
+{
+  "schema_version": "999.0.0",
+  "kei_api_url": "https://kei.example.com/api/v1",
+  "harness_id": "test-harness-003",
+  "harness_type": {
+    "slug": "agent-tool-proxy",
+    "version": "1.0.0"
+  },
+  "environment": "test",
+  "tool_bindings": [],
+  "secret_refs": {}
+}
