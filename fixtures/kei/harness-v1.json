@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "kei_api_url": "https://kei.example.com/api/v1",
+  "harness_id": "test-harness-001",
+  "workspace_id": "ws-test-workspace",
+  "harness_type": {
+    "slug": "agent-tool-proxy",
+    "version": "1.0.0"
+  },
+  "environment": "test",
+  "installation_id": "inst-12345",
+  "config_revision": "abc123def",
+  "tool_bindings": [
+    {
+      "tool_name": "web_search",
+      "connector_id": "web-connector",
+      "config": {
+        "rate_limit": 10,
+        "timeout": 30
+      }
+    },
+    {
+      "tool_name": "file_read",
+      "connector_id": "fs-connector",
+      "config": {
+        "allowed_paths": ["/home/user/*"]
+      }
+    }
+  ],
+  "secret_refs": {
+    "connector_web": {
+      "source": "secret_provider",
+      "key": "kei.connector.web.credentials"
+    },
+    "connector_fs": {
+      "source": "secret_provider",
+      "key": "kei.connector.fs.credentials"
+    }
+  }
+}
