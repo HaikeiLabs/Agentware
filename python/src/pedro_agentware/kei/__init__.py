@@ -1,0 +1,84 @@
+"""KEI proxy wrapper for agentware middleware.
+
+This module provides a canonical reusable proxy wrapper/config layer for
+integrating with the KEI (Knight Enforcement Interface) harness system.
+
+Key components:
+- Harness manifest loading (kei-harness.json) — versioned, non-secret
+- AuthProvider interface for token management (opaque + future JWT)
+- Local proxy executable discovery and subprocess invocation (fail closed)
+
+Security contract:
+- The bootstrap secret (KEI_HARNESS_TOKEN) is loaded only from the
+  environment or a secret provider. It is never stored in the manifest
+  and never logged.
+- Self-reported tool bindings/capabilities never grant permissions.
+"""
+
+from .auth import (
+    BOOTSTRAP_TOKEN_ENV,
+    AuthProvider,
+    AuthProviderFactory,
+    EnvSecretProvider,
+    JWTTokenProvider,
+    OpaqueTokenProvider,
+    SecretProvider,
+    TokenInfo,
+    TokenType,
+    get_auth_provider,
+)
+from .config import (
+    BINDINGS_GRANT_PERMISSIONS,
+    BOOTSTRAP_SECRET_NAME,
+    HarnessConfig,
+    HarnessManifest,
+    HarnessType,
+    SecretRef,
+    ToolBinding,
+    get_config,
+    load_manifest,
+    validate_manifest,
+)
+from .proxy import (
+    LocalProxyProcess,
+    ProxyConfig,
+    ProxyDiscoveryError,
+    ProxyExecutionError,
+    ProxyNotFoundError,
+    ProxyProcess,
+    discover_proxy,
+    run_proxy,
+    stop_proxy,
+)
+
+__all__ = [
+    "AuthProvider",
+    "AuthProviderFactory",
+    "BOOTSTRAP_TOKEN_ENV",
+    "EnvSecretProvider",
+    "JWTTokenProvider",
+    "OpaqueTokenProvider",
+    "SecretProvider",
+    "TokenInfo",
+    "TokenType",
+    "get_auth_provider",
+    "BINDINGS_GRANT_PERMISSIONS",
+    "BOOTSTRAP_SECRET_NAME",
+    "HarnessConfig",
+    "HarnessManifest",
+    "HarnessType",
+    "SecretRef",
+    "ToolBinding",
+    "get_config",
+    "load_manifest",
+    "validate_manifest",
+    "LocalProxyProcess",
+    "ProxyConfig",
+    "ProxyDiscoveryError",
+    "ProxyExecutionError",
+    "ProxyNotFoundError",
+    "ProxyProcess",
+    "discover_proxy",
+    "run_proxy",
+    "stop_proxy",
+]
