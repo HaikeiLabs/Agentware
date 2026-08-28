@@ -30,8 +30,12 @@ func enableTestMemory(t *testing.T) *WikiMemory {
 }
 
 func callerCtx(userID string) context.Context {
+	// InvokingSubject is the caller identity (the agent/user acting), recorded
+	// by the middleware separately from the session. It is deliberately distinct
+	// from SessionID, which the middleware records as ParentSpan.
 	return middleware.WithCallerContext(context.Background(), middleware.CallerContext{
 		UserID: userID, SessionID: "sess-" + userID, Trusted: true,
+		InvokingSubject: userID,
 	})
 }
 
@@ -85,7 +89,11 @@ func TestChainDenyCarriesDiagnosticsAndIsAudited(t *testing.T) {
 	if len(denies) != 1 {
 		t.Fatalf("expected 1 audited deny, got %d", len(denies))
 	}
-	if denies[0].ToolName != ToolWritePage || denies[0].InvokingSubject != "sess-alice" {
+	// The audit record must capture the caller identity (InvokingSubject) and
+	// the session (ParentSpan) as distinct, explicit fields.
+	if denies[0].ToolName != ToolWritePage ||
+		denies[0].InvokingSubject != "alice" ||
+		denies[0].ParentSpan != "sess-alice" {
 		t.Errorf("audit record mismatch: %+v", denies[0])
 	}
 	if _, ok := ParseDiagnostics(denies[0].Error); !ok {
