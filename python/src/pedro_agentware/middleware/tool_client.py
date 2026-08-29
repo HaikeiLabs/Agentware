@@ -8,10 +8,10 @@ and an Auditor themselves.
 """
 
 import inspect
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from .audit import AuditFilter, Auditor, AuditRecord, InMemoryAuditor
-from .middleware import MiddlewareImpl
 from .policy import PolicyEvaluator
 from .types import Action, CallerContext, Decision
 
