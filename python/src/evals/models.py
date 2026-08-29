@@ -1,6 +1,7 @@
 """
 Model backends and Agent executor for evals.
 """
+
 import json
 import os
 import urllib.error
@@ -93,17 +94,19 @@ class OpenAIClient(BaseModelClient):
         tool_calls = []
         if choice["message"].get("tool_calls"):
             for tc in choice["message"]["tool_calls"]:
-                tool_calls.append({
-                    "id": tc["id"],
-                    "name": tc["function"]["name"],
-                    "arguments": tc["function"]["arguments"]
-                })
+                tool_calls.append(
+                    {
+                        "id": tc["id"],
+                        "name": tc["function"]["name"],
+                        "arguments": tc["function"]["arguments"],
+                    }
+                )
 
         return ModelResult(
             content=choice["message"].get("content", ""),
             tool_calls=tool_calls,
             finish_reason=choice.get("finish_reason", ""),
-            usage=data.get("usage", {})
+            usage=data.get("usage", {}),
         )
 
 
@@ -142,10 +145,7 @@ class AnthropicClient(BaseModelClient):
             role = msg.get("role", "user")
             if role == "tool":
                 role = "user"
-            anthropic_messages.append({
-                "role": role,
-                "content": msg.get("content", "")
-            })
+            anthropic_messages.append({"role": role, "content": msg.get("content", "")})
 
         payload = {
             "model": self.model,
@@ -161,7 +161,7 @@ class AnthropicClient(BaseModelClient):
         headers = {
             "Content-Type": "application/json",
             "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01"
+            "anthropic-version": "2023-06-01",
         }
 
         req = urllib.request.Request(
@@ -183,17 +183,19 @@ class AnthropicClient(BaseModelClient):
             if block.get("type") == "text":
                 content += block.get("text", "")
             elif block.get("type") == "tool_use":
-                tool_calls.append({
-                    "id": block.get("id", ""),
-                    "name": block.get("name", ""),
-                    "arguments": json.dumps(block.get("input", {}))
-                })
+                tool_calls.append(
+                    {
+                        "id": block.get("id", ""),
+                        "name": block.get("name", ""),
+                        "arguments": json.dumps(block.get("input", {})),
+                    }
+                )
 
         return ModelResult(
             content=content,
             tool_calls=tool_calls,
             finish_reason=data.get("stop_reason", ""),
-            usage=data.get("usage", {})
+            usage=data.get("usage", {}),
         )
 
 
@@ -221,23 +223,26 @@ class OllamaClient(BaseModelClient):
                 ollama_messages.append({"role": "system", "content": msg.get("content", "")})
             elif msg.get("tool_calls"):
                 for tc in msg.get("tool_calls", []):
-                    ollama_messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [{
-                            "id": tc.get("id", ""),
-                            "type": "function",
-                            "function": {
-                                "name": tc.get("name", ""),
-                                "arguments": tc.get("arguments", "")
-                            }
-                        }]
-                    })
+                    ollama_messages.append(
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": tc.get("id", ""),
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.get("name", ""),
+                                        "arguments": tc.get("arguments", ""),
+                                    },
+                                }
+                            ],
+                        }
+                    )
             elif msg.get("role") == "tool":
-                ollama_messages.append({
-                    "role": "user",
-                    "content": f"[tool result]: {msg.get('content', '')}"
-                })
+                ollama_messages.append(
+                    {"role": "user", "content": f"[tool result]: {msg.get('content', '')}"}
+                )
             else:
                 ollama_messages.append(msg)
 
@@ -273,17 +278,19 @@ class OllamaClient(BaseModelClient):
         tool_calls = []
         if message.get("tool_calls"):
             for tc in message["tool_calls"]:
-                tool_calls.append({
-                    "id": tc.get("id", ""),
-                    "name": tc.get("function", {}).get("name", ""),
-                    "arguments": tc.get("function", {}).get("arguments", "")
-                })
+                tool_calls.append(
+                    {
+                        "id": tc.get("id", ""),
+                        "name": tc.get("function", {}).get("name", ""),
+                        "arguments": tc.get("function", {}).get("arguments", ""),
+                    }
+                )
 
         return ModelResult(
             content=content,
             tool_calls=tool_calls,
             finish_reason=data.get("done", False) and "stop" or "",
-            usage={}
+            usage={},
         )
 
 
@@ -317,10 +324,7 @@ class VLLMClient(BaseModelClient):
         if tools:
             payload["tools"] = tools
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
 
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions",
@@ -340,17 +344,19 @@ class VLLMClient(BaseModelClient):
         tool_calls = []
         if choice["message"].get("tool_calls"):
             for tc in choice["message"]["tool_calls"]:
-                tool_calls.append({
-                    "id": tc["id"],
-                    "name": tc["function"]["name"],
-                    "arguments": tc["function"]["arguments"]
-                })
+                tool_calls.append(
+                    {
+                        "id": tc["id"],
+                        "name": tc["function"]["name"],
+                        "arguments": tc["function"]["arguments"],
+                    }
+                )
 
         return ModelResult(
             content=choice["message"].get("content", ""),
             tool_calls=tool_calls,
             finish_reason=choice.get("finish_reason", ""),
-            usage=data.get("usage", {})
+            usage=data.get("usage", {}),
         )
 
 
@@ -413,17 +419,19 @@ class LlamaCPPClient(VLLMClient):
         content = msg.get("content", "")
 
         for tc in msg.get("tool_calls", []):
-            tool_calls.append({
-                "id": tc.get("id", ""),
-                "name": tc.get("function", {}).get("name", ""),
-                "arguments": tc.get("function", {}).get("arguments", ""),
-            })
+            tool_calls.append(
+                {
+                    "id": tc.get("id", ""),
+                    "name": tc.get("function", {}).get("name", ""),
+                    "arguments": tc.get("function", {}).get("arguments", ""),
+                }
+            )
 
         return ModelResult(
             content=content,
             tool_calls=tool_calls,
             finish_reason=choice.get("finish_reason", ""),
-            usage=data.get("usage", {})
+            usage=data.get("usage", {}),
         )
 
 
@@ -441,7 +449,9 @@ def create_model_client(
     elif backend == ModelBackend.OLLAMA:
         return OllamaClient(model, base_url or "http://localhost:11434", timeout)
     elif backend == ModelBackend.VLLM:
-        return VLLMClient(model, base_url or "http://localhost:8000/v1", api_key or "EMPTY", timeout)
+        return VLLMClient(
+            model, base_url or "http://localhost:8000/v1", api_key or "EMPTY", timeout
+        )
     elif backend == ModelBackend.LMSTUDIO:
         return LMStudioClient(model, base_url or "http://localhost:1234/v1", timeout)
     elif backend == ModelBackend.LLAMACPP:
@@ -454,9 +464,9 @@ ToolExecutor = Callable[[str, dict[str, Any]], str]
 
 
 class AgentExecutor:
-    """
-    Agent that calls LLM and executes tool calls.
-    Similar to EvalHarness.agent_fn in pedro-tag.
+    """Agent that calls LLM and executes tool calls.
+
+    For the harness contract, see ``docs/harness-contract.md``.
     """
 
     def __init__(
@@ -496,32 +506,27 @@ class AgentExecutor:
                 break
 
             for tc in result.tool_calls:
-                tool_calls_made.append({
-                    "turn": turns,
-                    "name": tc["name"],
-                    "arguments": tc["arguments"]
-                })
+                tool_calls_made.append(
+                    {"turn": turns, "name": tc["name"], "arguments": tc["arguments"]}
+                )
 
                 args = json.loads(tc["arguments"]) if tc["arguments"] else {}
                 tool_result = self.tool_executor(tc["name"], args)
 
-                messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [{
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {
-                            "name": tc["name"],
-                            "arguments": tc["arguments"]
-                        }
-                    }]
-                })
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": tool_result
-                })
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                            }
+                        ],
+                    }
+                )
+                messages.append({"role": "tool", "tool_call_id": tc["id"], "content": tool_result})
 
         return {
             "content": result.content if result else "",
