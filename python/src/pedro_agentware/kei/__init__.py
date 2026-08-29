@@ -39,6 +39,13 @@ from .config import (
     load_manifest,
     validate_manifest,
 )
+from .contract import (
+    HarnessContract,
+    ToolExecutionError,
+    ToolExecutor,
+    ToolNotFoundError,
+    validate_contract,
+)
 from .proxy import (
     LocalProxyProcess,
     ProxyConfig,
@@ -56,11 +63,15 @@ __all__ = [
     "AuthProviderFactory",
     "BOOTSTRAP_TOKEN_ENV",
     "EnvSecretProvider",
+    "HarnessContract",
     "JWTTokenProvider",
     "OpaqueTokenProvider",
     "SecretProvider",
     "TokenInfo",
     "TokenType",
+    "ToolExecutor",
+    "ToolExecutionError",
+    "ToolNotFoundError",
     "get_auth_provider",
     "BINDINGS_GRANT_PERMISSIONS",
     "BOOTSTRAP_SECRET_NAME",
@@ -71,6 +82,7 @@ __all__ = [
     "ToolBinding",
     "get_config",
     "load_manifest",
+    "validate_contract",
     "validate_manifest",
     "LocalProxyProcess",
     "ProxyConfig",
