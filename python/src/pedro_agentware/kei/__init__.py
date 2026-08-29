@@ -7,6 +7,8 @@ Key components:
 - Harness manifest loading (kei-harness.json) — versioned, non-secret
 - AuthProvider interface for token management (opaque + future JWT)
 - Local proxy executable discovery and subprocess invocation (fail closed)
+- KeiProxyEvaluator: a middleware PolicyEvaluator backed by kei-proxy, so
+  enforcement lives here rather than in each agent harness
 
 Security contract:
 - The bootstrap secret (KEI_HARNESS_TOKEN) is loaded only from the
@@ -46,6 +48,13 @@ from .contract import (
     ToolNotFoundError,
     validate_contract,
 )
+from .evaluator import (
+    AFFIRMATIVE_DECISIONS,
+    AuthorizationClient,
+    AuthorizationResponse,
+    KeiProxyEvaluator,
+    resources_touched,
+)
 from .proxy import (
     LocalProxyProcess,
     ProxyConfig,
@@ -59,6 +68,11 @@ from .proxy import (
 )
 
 __all__ = [
+    "AFFIRMATIVE_DECISIONS",
+    "AuthorizationClient",
+    "AuthorizationResponse",
+    "KeiProxyEvaluator",
+    "resources_touched",
     "AuthProvider",
     "AuthProviderFactory",
     "BOOTSTRAP_TOKEN_ENV",
