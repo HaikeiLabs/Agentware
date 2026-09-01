@@ -1,110 +1,111 @@
 # pedro-agentware
 
-MCP-compatible middleware for enforcing policies on tool calls in agent frameworks. This repository contains both Go and Python implementations.
+Policy enforcement and audit middleware for agent tool calls, in Go, Python, and
+TypeScript.
 
-## Go Middleware
+Every tool an agent invokes passes through one interception point: policy decides
+whether the call proceeds, and an audit record is emitted whether it does or not.
+The record shape does not change when you swap agent frameworks or models — which
+is the point.
 
-The Go middleware provides core policy enforcement for tool execution.
+## Why
 
-## Python Middleware
+Attribution dies at the first delegation hop. An agent spawns a subagent, the
+subagent runs as a service account, and every log downstream says "the agent did
+it." Nobody can answer who authorized an action, what data it touched, or what it
+cost.
 
-Python port of the Go middleware with LangGraph integration.
+This library keeps the invoking human subject attached through every hop, records
+the resources each call touched, and attributes token cost back up the delegation
+chain.
 
-### Features
+## What it does
 
-- **Policy Engine**: Enforce rate limits, max turns, iteration limits, and conditional rules
-- **Auditor**: Track and audit all tool call decisions
-- **LangGraph Integration**: Wrap LangGraph tool nodes with policy enforcement
-- **Flexible Configuration**: Load policies from YAML files
+**Policy enforcement.** Declarative rules — allow, deny, filter — with rate
+limits, turn caps, and conditions over caller attributes and tool arguments.
+Fail-closed by default: a call with no caller context is denied, not trusted.
 
-### Installation
+**Audit records.** One append-only record per tool call, carrying the invoking
+subject, the delegation chain (`parent_span`, `delegation_depth`), the originating
+framework, a SHA-256 digest of the arguments rather than the arguments themselves,
+the resources touched, the policy decision and the rule that made it, token counts,
+and latency. Metrics are rollups over these records; there is no second
+instrumentation path.
+
+**Framework adapters.** The same tool definition renders to a valid call format for
+each target framework, and produces the same audit row shape under each. Adapters
+live in `go/adapters/` — currently ADK and hermes.
+
+**Wiki memory.** An LLM-maintained, ontology-constrained markdown wiki scoped per
+user (`go/memory/`). Memory writes go through the same middleware chain as any
+other tool call — declarative policy plus a semantic tier that validates page
+frontmatter and typed links against a read-only ontology. Each vault resolves from
+the caller context, and cross-user access is rejected by policy rule *and* by a
+path-boundary check in the executor. Memory is not a side channel around the audit
+trail; it is another audited tool call.
+
+**Third-party harness contract.** The `kei/` module and `docs/harness-contract.md`
+define what a harness must implement to be governed by agentware without depending
+on any agent framework. Enforcement is shared library code: `KeiProxyEvaluator`
+fails closed on every path that is not an explicit `permit`/`allow`.
+
+## Install
 
 ```bash
-# Using uv (recommended)
-uv pip install middleware-py
+# Python (src-layout package pedro_agentware)
+pip install -e ./python
 
-# Using pip
-pip install middleware-py
+# Go
+go get github.com/soypete/pedro-agentware/go
 ```
 
-### Quick Start
+TypeScript lives in `typescript/`.
+
+## Quick start (Python)
 
 ```python
-from middleware_py import Middleware, Policy, Rule, Action, CallerContext
-from middleware_py.langgraph import LangGraphToolWrapper
+from pedro_agentware.middleware import AuditedToolClient, CallerContext
 
-# Define a policy
-policy = Policy(
-    rules=[
-        Rule(
-            name="rate-limit-tools",
-            tools=["*"],
-            action=Action.ALLOW,
-            max_rate={"count": 10, "window": 60},  # 10 calls per 60 seconds
-        ),
-    ],
-    default_deny=False,
-)
+def echo(**kwargs):
+    return {"echo": kwargs.get("value", "")}
 
-# Create middleware
-middleware = Middleware(policy=policy)
+client = AuditedToolClient(source="my-agent")
 
-# Wrap a LangGraph tool
-wrapper = LangGraphToolWrapper(policy=policy)
-wrapped_tool = wrapper.wrap(your_langgraph_tool_node)
+# At a human entry point the user IS the invoking subject; it survives every
+# subsequent delegation hop.
+caller = CallerContext(user_id="user-123", invoking_subject="user-123", source="my-agent")
+
+result = await client.Execute("echo", {"value": "hi"}, "user-123", "session-1", None, echo, caller=caller)
+# result == {"echo": "hi"}; an audit record was emitted for the call.
 ```
 
-### Architecture
+Delegation: when the agent spawns a subagent, hand the child its own context
+without losing the human:
 
-#### Core Components
+```python
+child = caller.delegate(span="subagent-1")
+# child.invoking_subject is still "user-123"; child.delegation_depth == 1
+```
 
-1. **Types** (`middleware_py.types`)
-   - `Action`: Enum for allow/deny/filter actions
-   - `ToolDefinition`: Tool metadata including name, description, input schema
-   - `ToolResult`: Result of tool execution
-   - `CallerContext`: Context about the caller (user, session, role, etc.)
-   - `Decision`: Policy decision result
+## Policy
 
-2. **Policy Engine** (`middleware_py.policy`)
-   - `Policy`: Collection of rules
-   - `Rule`: Individual policy rule with conditions, rate limits, etc.
-   - `PolicyEvaluator`: Interface for evaluating policies
-   - Supports operators: `eq`, `not_eq`, `contains`, `not_contains`, `matches`, `not_matches`, `exists`, `not_exists`
-
-3. **Auditor** (`middleware_py.audit`)
-   - `Auditor`: Interface for recording decisions
-   - `InMemoryAuditor`: Thread-safe in-memory storage
-   - `NoOpAuditor`: No-op implementation for testing
-
-4. **Middleware** (`middleware_py.middleware`)
-   - `Middleware`: Main middleware class wrapping tool executors
-   - `CallHistory`: Tracks called/failed tools per session
-   - Functional options pattern for configuration
-
-5. **LangGraph Integration** (`middleware_py.langgraph`)
-   - `LangGraphToolWrapper`: Wrap LangGraph tool nodes with policy enforcement
-
-### Policy YAML Format
+Rules are YAML or constructed in code:
 
 ```yaml
 rules:
   - name: "rate-limit-read"
-    tools:
-      - "read_file"
-      - "search"
+    tools: ["read_file", "search"]
     action: "allow"
     max_rate:
       count: 5
-      window: 60  # seconds
+      window: 60
     conditions:
       - field: "caller.role"
         operator: "eq"
         value: "user"
 
   - name: "deny-admin-tools"
-    tools:
-      - "delete_database"
-      - "drop_table"
+    tools: ["delete_database", "drop_table"]
     action: "deny"
     conditions:
       - field: "caller.trusted"
@@ -112,76 +113,65 @@ rules:
         value: "false"
 
   - name: "filter-sensitive"
-    tools:
-      - "get_user"
+    tools: ["get_user"]
     action: "filter"
-    redact_fields:
-      - "password"
-      - "ssn"
+    redact_fields: ["password", "ssn"]
 
 default_deny: false
 ```
 
-### Condition Operators
+**Operators**: `eq`, `not_eq`, `contains`, `not_contains`, `matches`,
+`not_matches`, `exists`, `not_exists`, `not`.
 
-| Operator | Description |
-|----------|-------------|
-| `eq` | Field equals value |
-| `not_eq` | Field does not equal value |
-| `contains` | Field contains value |
-| `not_contains` | Field does not contain value |
-| `matches` | Field matches regex pattern |
-| `not_matches` | Field does not match regex pattern |
-| `exists` | Field exists (not nil) |
-| `not_exists` | Field does not exist (nil) |
-| `not` | Field is empty |
+**Fields**: `caller.role`, `caller.user_id`, `caller.session_id`, `caller.source`,
+`context.trusted`, `args.<name>`, `context.<key>`.
 
-### Field Resolution
+## Audit record
 
-Conditions can reference:
-- `caller.role` - Caller's role
-- `caller.user_id` - User ID
-- `caller.session_id` - Session ID
-- `caller.source` - Call source
-- `context.trusted` - Whether caller is trusted
-- `args.<name>` - Tool argument values
-- `context.<key>` - Custom context metadata
+| Field | Notes |
+|-------|-------|
+| `invoking_subject` | The human who initiated the task. Survives every delegation hop. |
+| `parent_span`, `delegation_depth` | Reconstructs the full call tree |
+| `agent_id`, `agent_version` | |
+| `framework` | Which adapter originated the call — proves cross-framework uniformity |
+| `tool_name`, `tool_args_digest` | Digest, not raw args: avoids logging PII into the audit store |
+| `resources_touched[]` | Resource identifiers — table, bucket, endpoint — not tool names |
+| `decision`, `policy_id` | The outcome and the rule that decided it |
+| `model`, `tokens_in`, `tokens_out`, `cached_tokens` | Feeds cost attribution |
+| `latency_ms`, `error`, `retry_count`, `success` | Feeds reliability metrics |
 
-### LangGraph Integration
+`resources_touched` is what makes "show every agent invocation that read table X
+on behalf of user Y" answerable. Tool-name logging is what everyone does;
+resource-level lineage is what makes the question tractable.
 
-```python
-from langgraph.prebuilt import ToolNode
-from middleware_py.langgraph import LangGraphToolWrapper
+## Layout
 
-# Create wrapper
-wrapper = LangGraphToolWrapper(policy=your_policy)
+| Path | Contents |
+|------|----------|
+| `go/middleware/` | Policy engine, audit records, interception |
+| `go/adapters/` | Framework adapters (ADK, hermes) |
+| `go/memory/` | Wiki memory — see `SCHEMA.md` for the page contract |
+| `go/mcp/`, `go/llm/`, `go/executor/` | MCP server, model clients, execution |
+| `python/` | Python port (`pedro_agentware`), including the `kei/` harness surface |
+| `typescript/` | TypeScript port |
+| `docs/{go,python,typescript}/` | Usage examples per language |
+| `docs/engineering-design.md` | Architecture |
+| `docs/harness-contract.md` | Contract for third-party agent builders |
+| `docs/build-history/` | Archived build-loop working files |
 
-# Wrap a ToolNode
-tool_node = ToolNode([your_tool])
-wrapped_node = wrapper.wrap_tool_node(tool_node)
-
-# Or wrap a function directly
-def my_tool(state):
-    return {"result": "done"}
-
-wrapped_my_tool = wrapper.wrap(my_tool)
-```
-
-### Development
+## Development
 
 ```bash
-# Install dependencies
-uv pip install -e .
+# Go
+cd go && go build ./... && go test ./...
 
-# Run tests
-uv test
-
-# Run with coverage
-uv test --cov=middleware_py --cov-report=html
-
-# Format code
-ruff format .
+# Python
+cd python && pip install -e ".[dev]" && pytest && ruff check . && mypy src/
 ```
+
+The ontology T-box is a git submodule: run `git submodule update --init` after
+cloning. It is read-only — missing terms go in `SCHEMA_GAPS.md`, never invented
+locally.
 
 ## License
 

@@ -1,6 +1,8 @@
 # Go Middleware Usage Examples
 
-This document provides examples of how to use the Go middleware for policy enforcement.
+This document provides examples of how to use the Go middleware for policy
+enforcement and audit logging. It is the reference implementation; the Python
+and TypeScript ports mirror it.
 
 ## Basic Usage
 
@@ -10,23 +12,20 @@ This document provides examples of how to use the Go middleware for policy enfor
 package main
 
 import (
-    "context"
-    "fmt"
     "time"
 
     "github.com/soypete/pedro-agentware/go/middleware"
-    "github.com/soypete/pedro-agentware/go/middleware/types"
 )
 
 func main() {
-    policy := types.Policy{
+    policy := &middleware.Policy{
         DefaultDeny: false,
-        Rules: []types.Rule{
+        Rules: []middleware.Rule{
             {
                 Name:  "rate-limit-tools",
                 Tools: []string{"*"},
-                Action: types.ActionAllow,
-                MaxRate: &types.RateLimit{
+                Action: middleware.ActionAllow,
+                MaxRate: &middleware.RateLimit{
                     Count:  10,
                     Window: 60 * time.Second,
                 },
@@ -34,11 +33,11 @@ func main() {
             {
                 Name:  "deny-admin",
                 Tools: []string{"delete_database", "drop_table"},
-                Action: types.ActionDeny,
-                Conditions: []types.Condition{
+                Action: middleware.ActionDeny,
+                Conditions: []middleware.Condition{
                     {
                         Field:    "caller.trusted",
-                        Operator: "eq",
+                        Operator: middleware.OperatorEq,
                         Value:    "false",
                     },
                 },
@@ -51,142 +50,80 @@ func main() {
 ### Wrapping a Tool Executor
 
 ```go
-// Create a custom tool executor (implementing types.ToolExecutor)
+import (
+    "context"
+
+    "github.com/soypete/pedro-agentware/go/middleware"
+    "github.com/soypete/pedro-agentware/go/tools"
+)
+
+// A ToolExecutor runs a named tool with the given args.
 type MyToolExecutor struct{}
 
-func (e *MyToolExecutor) CallTool(ctx context.Context, name string, args map[string]interface{}) (*types.ToolResult, error) {
+func (e *MyToolExecutor) Execute(ctx context.Context, toolName string, args map[string]any) (*tools.Result, error) {
     // Your tool execution logic here
-    return &types.ToolResult{
-        Content:  fmt.Sprintf("Executed %s", name),
-        Metadata: map[string]interface{}{},
-    }, nil
-}
-
-func (e *MyToolExecutor) ListTools() []types.ToolDefinition {
-    return []types.ToolDefinition{
-        {Name: "read_file", Description: "Read a file"},
-        {Name: "write_file", Description: "Write a file"},
-    }
+    return &tools.Result{Success: true, Output: "Executed " + toolName}, nil
 }
 
 // Create middleware
-executor := &MyToolExecutor{}
-mw := middleware.New(executor, policy)
+exec := &MyToolExecutor{}
+mw := middleware.NewMiddleware(exec).WithPolicy(policy).WithAuditor(auditor)
 
 // Call a tool through middleware
-result, err := mw.CallTool(context.Background(), "read_file", map[string]interface{}{
-    "path": "/tmp/test.txt",
-})
+result, err := mw.Execute(context.Background(), "read_file", map[string]any{"path": "/tmp/test.txt"})
 ```
 
-### Using Caller Context
+### Using Caller Context and Delegation
 
 ```go
-// Create caller context with user information
-callerCtx := types.CallerContext{
-    Trusted:   true,
-    Role:      "user",
-    UserID:    "user-123",
-    SessionID: "session-456",
-    Source:    "cli",
+// Create caller context with user information. InvokingSubject is the human
+// who started the request; Trusted defaults to false (fail-closed).
+caller := middleware.CallerContext{
+    Trusted:         true,
+    Role:            "user",
+    UserID:          "user-123",
+    SessionID:       "session-456",
+    Source:          "cli",
+    InvokingSubject: "user-123",
 }
 
-// Add context to request
-ctx := middleware.WithCallerContext(context.Background(), callerCtx)
+// Attach it to the context, then spawn a subagent. The invoking subject is
+// carried unchanged and the depth increments, so the audit trail resolves
+// back to the human who authorized the request.
+ctx := middleware.WithCallerContext(context.Background(), caller)
+subagent := caller.Delegate("subagent-1")
+// subagent.InvokingSubject == "user-123"
+// subagent.DelegationDepth == 1
+// subagent.ParentSpan == "subagent-1"
 
-result, err := mw.CallTool(ctx, "read_file", map[string]interface{}{
-    "path": "/tmp/test.txt",
-})
+result, err := mw.Execute(ctx, "read_file", map[string]any{"path": "/tmp/test.txt"})
 ```
 
 ### Using Audit
 
 ```go
-import "github.com/soypete/pedro-agentware/middleware/audit"
-
 // Create in-memory auditor
-auditor := audit.NewInMemoryAuditor()
+auditor := middleware.NewInMemoryAuditor()
+mw := middleware.NewMiddleware(exec).WithAuditor(auditor)
 
-// Configure middleware with auditor
-mw := middleware.New(executor, policy, middleware.WithAuditor(auditor))
-
-// After tool calls, get audit log
-log := auditor.GetLog()
-for _, entry := range log {
-    fmt.Printf("Decision: %s, Tool: %s, Rule: %s\n",
-        entry.Decision.Action, entry.Decision.Tool, entry.Decision.Rule)
+// After tool calls, query the audit log. Records carry the delegation chain:
+// InvokingSubject, ParentSpan, DelegationDepth, Framework.
+records := auditor.Query(middleware.AuditFilter{SessionID: "session-456"})
+for _, entry := range records {
+    fmt.Printf("Decision: %s, Tool: %s, Rule: %s\n", entry.Decision, entry.ToolName, entry.PolicyID)
 }
 ```
 
-## Loading Policy from YAML
+### Audited Tool Client
 
 ```go
-import "github.com/soypete/pedro-agentware/middleware"
+client := middleware.NewAuditedToolClient("my-agent", func(ctx context.Context, toolName string, args map[string]any) (*tools.Result, error) {
+    return &tools.Result{Success: true}, nil
+})
 
-func main() {
-    // Load policy from YAML file
-    policy, err := middleware.LoadPolicyFromFile("policy.yaml")
-    if err != nil {
-        panic(err)
-    }
-
-    mw := middleware.New(executor, *policy)
-}
+result, err := client.Execute(ctx, "read_file", map[string]any{"path": "/tmp/test.txt"})
+// result: audited either way; framework stamped from the client source.
 ```
-
-Example `policy.yaml`:
-
-```yaml
-rules:
-  - name: "rate-limit-read"
-    tools:
-      - "read_file"
-      - "search"
-    action: "allow"
-    max_rate:
-      count: 5
-      window: 60
-
-  - name: "deny-admin-tools"
-    tools:
-      - "delete_database"
-    action: "deny"
-    conditions:
-      - field: "caller.trusted"
-        operator: "eq"
-        value: "false"
-
-default_deny: false
-```
-
-## Filtering Tool List
-
-The middleware can filter available tools based on policy rules:
-
-```go
-// Get list of allowed tools for a caller
-tools := mw.ListTools()
-for _, tool := range tools {
-    fmt.Println(tool.Name)
-}
-```
-
-### Phase-based Tool Filtering
-
-For multi-phase workflows (like PedroCLI's phased executor):
-
-```go
-callerCtx := types.CallerContext{
-    Phase: "planning", // Phase name
-}
-
-// Get tools available for a specific phase
-tools := mw.GetToolsForPhase("planning", callerCtx)
-```
-
-This filters out:
-- Tools already called in this phase
-- Tools that have failed 3+ times in this phase
 
 ## Condition Operators
 
@@ -196,36 +133,25 @@ This filters out:
 | `not_eq` | Field does not equal value |
 | `contains` | Field contains value |
 | `not_contains` | Field does not contain value |
-| `matches` | Field matches regex pattern |
-| `not_matches` | Field does not match regex pattern |
+| `matches` | Field matches pattern |
+| `not_matches` | Field does not match pattern |
 | `exists` | Field exists |
 | `not_exists` | Field does not exist |
-| `not` | Field is empty |
 
 ## Field Resolution
 
 Conditions can reference:
+
 - `caller.role` - Caller's role
 - `caller.user_id` - User ID
 - `caller.session_id` - Session ID
 - `caller.source` - Call source
 - `caller.trusted` - Whether caller is trusted
 - `args.<name>` - Tool argument values
-- `context.<key>` - Custom context metadata
 
-## Using with PedroCLI
+## Fail-Closed Defaults
 
-The middleware integrates with PedroCLI's ToolBridge pattern:
-
-```go
-import "github.com/soypete/pedro-cli/bridge"
-
-func main() {
-    // Create middleware wrapping your executor
-    mw := middleware.New(executor, policy)
-
-    // Use with PedroCLI bridge
-    b := bridge.NewBridge(mw)
-    // ... continue with PedroCLI setup
-}
-```
+- A missing caller context is never trusted (`CallerContext.Trusted` defaults
+  to false).
+- The hermes and ADK adapters follow the same rule: no context, no trust.
+- A policy denial is an audited outcome, not a transport error.

@@ -40,8 +40,9 @@ func (a *ADKToolAdapter) BeforeToolCallback(toolName string, args map[string]any
 		}
 	}
 	if a.middleware != nil {
+		// Fail-closed: a caller not present in the context is untrusted.
 		caller := middleware.CallerContext{
-			Trusted: true,
+			Trusted: false,
 		}
 		ctx := middleware.WithCallerContext(context.Background(), caller)
 		ctx = middleware.WithFramework(ctx, "adk")
@@ -139,26 +140,19 @@ func NewAuditAdapter(m middleware.Middleware, auditor middleware.Auditor) *ADKTo
 	adapter := NewAdapter(m)
 	adapter.RegisterAfterCallback(func(toolName string, args map[string]any, result *tools.Result, err error) {
 		if auditor != nil {
-			caller := middleware.CallerContext{
-				Trusted:         true,
-				InvokingSubject: callerFromContext(context.Background()),
-			}
+			// The after-callback carries no context, so no caller identity is
+			// attributable here; the middleware records the authoritative
+			// record with the full delegation chain. This fallback row exists
+			// only to surface outcome fields (success, error) when the audit
+			// record did not already capture them. It is never trusted.
 			auditor.Record(middleware.AuditRecord{
-				InvokedAt:       time.Now(),
-				InvokingSubject: caller.InvokingSubject,
-				Framework:       "adk",
-				ToolName:        toolName,
-				Success:         result.Success,
-				Error:           result.Error,
+				InvokedAt: time.Now(),
+				Framework: "adk",
+				ToolName:  toolName,
+				Success:   result.Success,
+				Error:     result.Error,
 			})
 		}
 	})
 	return adapter
-}
-
-func callerFromContext(ctx context.Context) string {
-	if c, ok := middleware.CallerFromContext(ctx); ok {
-		return c.UserID
-	}
-	return ""
 }

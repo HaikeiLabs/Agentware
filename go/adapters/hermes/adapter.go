@@ -226,8 +226,10 @@ func (a *HermesMiddlewareAdapter) Execute(ctx context.Context, toolName string, 
 	if a.auditor != nil {
 		a.auditor.Record(middleware.AuditRecord{
 			InvokedAt:       time.Now(),
-			InvokingSubject: caller.UserID,
-			ParentSpan:      caller.SessionID,
+			InvokingSubject: caller.InvokingSubject,
+			ParentSpan:      caller.ParentSpan,
+			DelegationDepth: caller.DelegationDepth,
+			Framework:       "hermes",
 			ToolName:        toolName,
 			Decision:        string(decision.Action),
 			PolicyID:        decision.Rule,
@@ -269,8 +271,9 @@ func getCallerContext(ctx context.Context) middleware.CallerContext {
 	if c, ok := middleware.CallerFromContext(ctx); ok {
 		return c
 	}
+	// Fail-closed: a missing caller context is untrusted, never trusted.
 	return middleware.CallerContext{
-		Trusted: true,
+		Trusted: false,
 	}
 }
 

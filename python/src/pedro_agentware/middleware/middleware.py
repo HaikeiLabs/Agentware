@@ -10,9 +10,7 @@ from .types import Action, CallerContext, Decision
 class ToolExecutor(Protocol):
     """Protocol for tool executors."""
 
-    def execute(
-        self, tool_name: str, args: dict[str, Any]
-    ) -> tuple[Any, bool, str]:
+    def execute(self, tool_name: str, args: dict[str, Any]) -> tuple[Any, bool, str]:
         """Execute a tool. Returns (result, success, error)."""
         ...
 
@@ -21,7 +19,11 @@ class Middleware(Protocol):
     """Protocol for middleware."""
 
     def execute(
-        self, tool_name: str, args: dict[str, Any], caller: CallerContext
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        caller: CallerContext,
+        framework: str = "",
     ) -> tuple[Any, bool, str]:
         """Execute a tool call through middleware."""
         ...
@@ -49,7 +51,11 @@ class MiddlewareImpl:
         self._auditor = auditor
 
     def execute(
-        self, tool_name: str, args: dict[str, Any], caller: CallerContext
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        caller: CallerContext,
+        framework: str = "",
     ) -> tuple[Any, bool, str]:
         """Execute a tool call through middleware."""
         if self._evaluator:
@@ -61,6 +67,10 @@ class MiddlewareImpl:
             self._auditor.record(
                 AuditRecord(
                     session_id=caller.session_id,
+                    invoking_subject=caller.invoking_subject,
+                    parent_span=caller.parent_span,
+                    delegation_depth=caller.delegation_depth,
+                    framework=framework,
                     tool_name=tool_name,
                     args=args,
                     decision=decision,
