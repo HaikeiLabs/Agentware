@@ -2,78 +2,36 @@
 
 ## Overview
 
-This is the **agent-middleware** repository — a Go module that provides MCP-compatible middleware enforcing contracts on context, tools, and data. The middleware sits between the agent (LLM orchestrator) and tool execution, intercepting every tool call to enforce policies before allowing execution.
+This is **pedro-agentware** — MCP-compatible middleware for LLM tool calling. It sits between an agent (LLM orchestrator) and tool execution, enforcing policy on every tool call (allow / deny / filter, rate limits, caller-context conditions) and emitting an audit record per call, whether the call proceeds or not.
 
-This repository is currently in the planning/engineering design phase. The actual Go implementation will be created based on the architecture defined in `business/ENGINEERING_DESIGN.md`.
+The same library is implemented three times — **Go (`go/`, the reference implementation), Python (`python/`), and TypeScript (`typescript/`)** — with deliberately mirrored package structure and mirrored test suites. When changing shared logic (middleware, guardrails, toolformat, llmcontext, tools), check whether the counterparts in the other languages and their tests need the same change.
 
----
-
-## Project Context
-
-This middleware integrates with:
-- **PedroCLI** - Agent framework with mature tool registry and bridge patterns
-- **professor_pedro** - Learning platform with orchestrator patterns
-- **iam_pedro** - Bot platform with moderation and rate-limiting
-
-Reference documents in `business/`:
-- `ENGINEERING_DESIGN.md` - Core architecture and interfaces
-- `CODE_EXTRACTION_PLAN.md` - What code to extract from existing repos
-- `EXISTING_PATTERNS.md` - Patterns to leverage from existing codebases
-- `SDK_PLAN.md` - SDK design and usage patterns
-- `MILESTONE_DETAILS.md` - Implementation milestones
-
----
+The delegation contract: `CallerContext.InvokingSubject` is the human who initiated the request and is carried unchanged across every delegation hop (`CallerContext.Delegate` / `delegate()`); `ParentSpan` and `DelegationDepth` record where in the chain the call sits. `Trusted` defaults to **false** (fail-closed) in every language, and a missing caller context is never promoted to trusted.
 
 ## Build, Lint, and Test Commands
 
-### Python (pedro-agentware)
+### Go (module at `go/`)
 
 ```bash
-# Install dependencies
-cd python && pip install -e ".[dev]"
-
-# Run linter
-ruff check .
-
-# Run type checker
-mypy .
-
-# Run all tests
-pytest
-
-# Run a single test
-pytest -k TestName
-
-# Run with verbose output
-pytest -v
-
-# Format code
-ruff format .
+cd go
+go build ./...
+go test ./...                     # all tests
+go test -run TestName ./middleware/   # a single test
+go vet ./...
+gofmt -w .                         # format
+golangci-lint run                  # lint (CI runs golangci-lint)
 ```
 
-### Go (middleware)
+### Python (src-layout package `pedro_agentware` at `python/`)
 
 ```bash
-# Build the module
-go build ./...
-
-# Run all tests
-go test ./...
-
-# Run a single test
-go test -run TestName ./...
-
-# Run with verbose output
-go test -v -run TestName ./...
-
-# Run linter
-golangci-lint run
-
-# Format code
-gofmt -w .
-
-# Vet code
-go vet ./...
+cd python
+pip install -e ".[dev]"
+pytest                            # test files are *_test.py (not test_*.py); asyncio_mode=auto
+pytest -k TestName
+ruff check .                       # lint
+ruff format .                      # format
+mypy src/                          # strict typing (CI runs both)
 ```
 
 ### Testing Guidelines
@@ -82,9 +40,24 @@ go vet ./...
 - Use table-driven tests for functions with multiple test cases
 - Mock external dependencies (Policy, Auditor, ToolExecutor)
 - Test both success and failure paths
-- Name test files: `*_test.go`
+- Name Go test files `*_test.go`; Python test files `*_test.py`
+- Test fail-closed behavior explicitly: missing caller context, unknown decision, unreachable policy endpoint all deny
 
 ---
+
+## Architecture
+
+Each language implementation contains the same packages (Go names shown; Python/TS mirror them):
+
+- **`middleware/`** — the core: `Middleware` wraps a `ToolExecutor`; a `PolicyEvaluator` returns a `Decision` (allow / deny / filter-with-redacted-args) from the tool name, args, and `CallerContext` (user, session, role, trusted, delegation fields — carried in `context.Context` in Go); an `Auditor` records every decision. Rules match tools by glob, support condition operators (`eq`, `contains`, `matches`, `exists`, negations), and per-tool rate limits (`ratelimit.go`). Configured via chained options: `NewMiddleware(exec).WithPolicy(...).WithAuditor(...)`. `AuditedToolClient` (`tool_client.go` / `tool_client.py`) is the small dependency-free surface: a function in, a `Result` out, audited either way.
+- **`middleware/guardrails/`** — agent-loop guardrails: error tracker, nudge, response validator, step enforcer.
+- **`toolformat/`** — formats/parses tool calls for open models that lack native tool-call APIs: generic, llama, minimax, mistral, nemotron, qwen, plus a selector.
+- **`llm/` + `llmcontext/`** — token counting, context-window accounting, and conversation compaction.
+- **`llm/proxy/` + `cmd/pedro-proxy/`** (Go only) — `pedro-proxy`, an OpenAI-compatible HTTP proxy in front of a backend (llama-server, Ollama) that adds retries, context-window management, and compaction.
+- **`tools/`, `executor/`, `jobs/`, `prompts/`** — tool registry/results, dispatch, background jobs, system-prompt generation with tool sections.
+- **Adapters** — wrap agent backends behind a unified interface: Go `go/adapters/{adk,hermes}`; Python `python/adapters/{hermes,kitaru,pydantic}` (each with its own `pyproject.toml`). See `python/adapters/README.md`.
+- **`memory/`** (Go) — "wiki memory": an LLM-maintained, ontology-constrained markdown wiki scoped per user. `memory.Vault` resolves per-user directories (`<root>/<user>/wiki/` + `raw/`) with path-boundary containment; `memory/page` parses frontmatter + typed wikilinks and emits the A-box as N-Triples; `memory/ontology` loads the read-only T-box and validates pages, returning structured `Violation` diagnostics. RDF handling uses `github.com/soypete/ontology-go`. The T-box lives in the `ontologies/` git submodule (`git submodule update --init` after cloning) and is read-only: missing terms go in `SCHEMA_GAPS.md`, never invented. The page contract is in `SCHEMA.md`.
+- **`kei/`** (Python) — the KEI integration surface for third-party harnesses: `HarnessContract`, auth providers, proxy config, and `KeiProxyEvaluator`, a `PolicyEvaluator` that fails closed on every path that is not an explicit affirmative (`permit`/`allow`). See `docs/harness-contract.md`.
 
 ## Code Style Guidelines
 
@@ -93,7 +66,7 @@ go vet ./...
 - Write idiomatic Go — follow standard library conventions
 - Keep functions small and focused (single responsibility)
 - Prefer composition over inheritance
-- Use interfaces for abstraction (see existing patterns in docs)
+- Use interfaces for abstraction; define them early
 
 ### Naming Conventions
 
@@ -109,45 +82,7 @@ go vet ./...
 - Standard library first, then third-party, then internal
 - Group imports: stdlib | external | internal
 - Use explicit imports (no dot imports)
-- Example:
-
-```go
-import (
-    "context"
-    "errors"
-    "time"
-
-    "github.com/google/uuid"
-    "go.uber.org/zap"
-
-    "middleware/internal/config"
-)
-```
-
-### Formatting
-
-- Use `gofmt` or `go fmt` — no manual formatting
-- Maximum line length: 100 characters (let gofmt handle)
 - Add newline between import groups
-- No trailing whitespace
-
-### Types and Interfaces
-
-- Define interfaces early — they clarify contracts
-- Use concrete types for implementation, interfaces for dependencies
-- Embed interfaces rather than wrapping where possible
-- Document all exported types and interfaces
-
-Example from design docs:
-
-```go
-// ToolExecutor is the interface the middleware wraps.
-// Matches PedroCLI's ToolBridge pattern.
-type ToolExecutor interface {
-    CallTool(ctx context.Context, name string, args map[string]interface{}) (*ToolResult, error)
-    ListTools() []ToolDefinition
-}
-```
 
 ### Error Handling
 
@@ -171,88 +106,30 @@ type ToolExecutor interface {
 - Log at appropriate levels: Debug for details, Info for normal flow, Error for failures
 - Don't log sensitive data (keys, tokens, passwords)
 
-### Configuration
-
-- Use YAML or JSON config files
-- Support environment variable overrides
-- Provide sensible defaults
-- Validate config on startup
-
-### Concurrency
-
-- Use goroutines for concurrent operations
-- Always use `context` for cancellation
-- Use `sync.WaitGroup` or channels for synchronization
-- Protect shared state with mutexes or channels
-- Don't leak goroutines — ensure they can exit
-
-### Testing Best Practices
-
-- Test behavior, not implementation
-- Use subtests for grouped test cases
-- Benchmark performance-critical code
-- Test edge cases and error conditions
-- Keep tests fast and independent
-
 ### Documentation
 
-- Document all exported symbols
-- Use doc comments (no doc blocks for internal)
-- Example: `// ToolResult represents the result of a tool execution.`
+- Document all exported symbols with doc comments
 - Include usage examples for complex APIs
-
-### Performance Considerations
-
-- Reuse buffers where possible
-- Use sync.Pool for frequently allocated objects
-- Avoid unnecessary allocations in hot paths
-- Profile before optimizing
 
 ---
 
 ## Key Patterns to Follow
 
-Based on existing Pedro repos:
-
 1. **ToolBridge Pattern**: Wrap executor with middleware interface
-2. **Validation First**: Validate tool calls before execution (PedroCLI pattern)
-3. **Filter Tool Definitions**: Remove tools before LLM sees them
-4. **Audit Everything**: Log all decisions with full context
-5. **Rate Limiting**: Track per-tool, per-user usage
-6. **Config Hierarchy**: Project -> User -> Defaults
+2. **Validation First**: Validate tool calls before execution
+3. **Filter Tool Definitions**: Remove tools before the LLM sees them
+4. **Audit Everything**: Log all decisions with full context, including the delegation chain
+5. **Fail Closed**: Missing context, unknown decisions, and unreachable policy endpoints deny — never allow
+6. **Rate Limiting**: Track per-tool, per-user usage
+7. **Config Hierarchy**: Project -> User -> Defaults
 
----
+## Docs and Design References
 
-## Directory Structure (Proposed)
-
-```
-middleware/
-├── go.mod
-├── go.sum
-├── middleware.go       # Core middleware implementation
-├── types.go            # Core types (ToolDefinition, ToolResult)
-├── executor.go         # ToolExecutor interface
-├── policy/
-│   ├── policy.go       # Policy interface and implementations
-│   └── config.go       # Policy configuration
-├── audit/
-│   ├── audit.go        # Auditor interface
-│   └── logger.go       # Audit logger implementation
-├── context/
-│   └── context.go      # Context control (trusted/untrusted)
-├── data/
-│   └── filter.go       # Data control (response filtering)
-└── examples/
-    └── main.go         # Usage examples
-```
-
----
-
-## Future Integration
-
-Once implemented, this middleware will be imported by:
-- `PedroCLI` — replaces existing bridge implementations
-- `professor_pedro` — wraps tool execution
-- `iam_pedro` — adds policy enforcement to moderation tools
+- `business/` — PRD, engineering design, SDK plan, milestones. Read `ENGINEERING_DESIGN.md` and `SDK_PLAN.md` before architectural changes.
+- `docs/harness-contract.md` — the contract third-party agent builders implement against.
+- `SCHEMA.md` — the wiki-memory page contract. `SCHEMA_GAPS.md` — **active**: ontology terms the read-only T-box lacks; add entries here rather than inventing terms locally.
+- `docs/build-history/` — archived working files from the wiki-memory build loop. `DECISIONS.md` there explains why the component is shaped as it is. Historical, not maintained.
+- `docs/{go,python,typescript}/` — usage examples per language.
+- Staleness warning: older docs reference the pre-rename packages `middleware-py` / `middleware_py`. The actual Python package is `pedro_agentware`; actual Go types live in `go/middleware` (e.g. `middleware.Decision`, `tools.Result`). Trust the code over the docs.
 
 Follow semantic versioning for releases.
