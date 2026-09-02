@@ -1,4 +1,4 @@
-import { Nudge, retryNudge, unknownToolNudge } from "./nudge";
+import { Nudge, retryNudge, unknownToolNudge } from "./nudge.js";
 
 export interface ToolCall {
   tool: string;
