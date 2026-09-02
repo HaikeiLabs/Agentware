@@ -4,6 +4,8 @@ This document provides examples of how to use the TypeScript middleware
 (`@pedro/agentware`) for policy enforcement and audit logging. It mirrors the
 Go reference implementation in `go/middleware/`.
 
+For the package artifact, release, and npm publishing contract, see the [npm distribution strategy](./npm-distribution-strategy.md).
+
 ## Installation
 
 ```bash
