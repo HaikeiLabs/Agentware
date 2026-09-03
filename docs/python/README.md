@@ -12,6 +12,11 @@ pip install -e ./python
 cd python && pip install -e ".[dev]"
 ```
 
+The package is not published to PyPI yet. See
+[PyPI distribution strategy](pypi-distribution-strategy.md) for the artifact
+contract, release process, and the packaging work required before the first
+publish.
+
 ## Basic Usage
 
 ### Creating a Policy
