@@ -25,9 +25,9 @@ class FakeProxy:
         self._raises = raises
         self.calls: list[dict] = []
 
-    def authorize(self, user_id: str, tool: str, action: str, resource: str):
+    def authorize(self, user_id: str, tool: str, action: str, resource: str, **context):
         self.calls.append(
-            {"user_id": user_id, "tool": tool, "action": action, "resource": resource}
+            {"user_id": user_id, "tool": tool, "action": action, "resource": resource, **context}
         )
         if self._raises is not None:
             raise self._raises
@@ -170,6 +170,34 @@ def test_falls_back_to_user_id_when_no_invoking_subject():
 def test_resource_sent_to_the_proxy_is_derived_from_args():
     _, proxy = evaluate({"decision": "permit"})
     assert proxy.calls[0]["resource"] == "github:repo:acme/sales-pipeline"
+
+
+def test_full_audit_context_is_sent_to_the_proxy():
+    proxy = FakeProxy({"decision": "permit"})
+    caller = CallerContext(
+        user_id="agent-user",
+        invoking_subject="U_HUMAN",
+        parent_span="parent-1",
+        delegation_depth=2,
+        span_id="span-1",
+        agent_id="agent-1",
+        agent_version="1.2.3",
+        framework="agentware",
+        workspace_id="workspace-1",
+    )
+    args = {"owner": "acme", "repo": "sales-pipeline"}
+    KeiProxyEvaluator(proxy).evaluate("github.create_issue", args, caller)
+
+    call = proxy.calls[0]
+    assert call["span_id"] == "span-1"
+    assert call["invoking_subject"] == "U_HUMAN"
+    assert call["parent_span"] == "parent-1"
+    assert call["delegation_depth"] == 2
+    assert call["agent_id"] == "agent-1"
+    assert call["framework"] == "agentware"
+    assert call["workspace_id"] == "workspace-1"
+    assert call["resources"] == ["github:repo:acme/sales-pipeline"]
+    assert len(call["tool_args_digest"]) == 64
 
 
 # --- resources_touched ------------------------------------------------------
