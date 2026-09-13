@@ -1,11 +1,25 @@
 {
-  "name": "@pedro/agentware",
+  "name": "@haikeilabs/agentware",
   "version": "0.1.0",
   "description": "Agent middleware and tooling for LLM tool calling",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HaikeiLabs/Agentware.git",
+    "directory": "typescript"
+  },
+  "homepage": "https://github.com/HaikeiLabs/Agentware#readme",
+  "bugs": {
+    "url": "https://github.com/HaikeiLabs/Agentware/issues"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
+    "prepack": "npm run build",
     "build": "tsc",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "eslint src --ext .ts",
@@ -17,7 +31,7 @@
     "tool",
     "middleware"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "authors": [
     {
       "name": "Pedro Team",

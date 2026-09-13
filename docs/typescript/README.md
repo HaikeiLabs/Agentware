@@ -1,7 +1,7 @@
 # TypeScript Middleware Usage Examples
 
 This document provides examples of how to use the TypeScript middleware
-(`@pedro/agentware`) for policy enforcement and audit logging. It mirrors the
+(`@haikeilabs/agentware`) for policy enforcement and audit logging. It mirrors the
 Go reference implementation in `go/middleware/`.
 
 For the package artifact, release, and npm publishing contract, see the [npm distribution strategy](./npm-distribution-strategy.md).
@@ -9,7 +9,7 @@ For the package artifact, release, and npm publishing contract, see the [npm dis
 ## Installation
 
 ```bash
-npm install @pedro/agentware
+npm install @haikeilabs/agentware
 ```
 
 ## Basic Usage
@@ -26,7 +26,7 @@ import {
   Policy,
   Rule,
   SimplePolicyEvaluator,
-} from "@pedro/agentware/middleware";
+} from "@haikeilabs/agentware/middleware";
 
 const policy: Policy = {
   default_deny: false,
@@ -57,7 +57,7 @@ import {
   CallerContext,
   MiddlewareImpl,
   ToolExecutor,
-} from "@pedro/agentware/middleware";
+} from "@haikeilabs/agentware/middleware";
 
 const executor: ToolExecutor = {
   execute(toolName: string, args: Record<string, unknown>): [unknown, boolean, string] {
@@ -93,7 +93,7 @@ const [result, success, error] = mw.execute("read_file", { path: "/tmp/test.txt"
 ### Using Audit
 
 ```typescript
-import { AuditFilter, InMemoryAuditor } from "@pedro/agentware/middleware";
+import { AuditFilter, InMemoryAuditor } from "@haikeilabs/agentware/middleware";
 
 const auditor = new InMemoryAuditor();
 const mw = new MiddlewareImpl(executor).withPolicy(evaluator).withAuditor(auditor);
