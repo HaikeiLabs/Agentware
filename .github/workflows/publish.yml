@@ -4,9 +4,15 @@ on:
   push:
     tags:
       - "agentware-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (must match typescript/package.json)"
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -14,7 +20,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    name: Prepare Agentware release
+    runs-on: ubuntu-latest
+    outputs:
+      release_ref: ${{ steps.release.outputs.release_ref }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - id: release
+        name: Verify version and create release tag
+        working-directory: typescript
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            expected_version="$INPUT_VERSION"
+          else
+            expected_version="${REF_NAME#agentware-v}"
+          fi
+
+          if ! [[ "$expected_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid semantic version: $expected_version" >&2
+            exit 1
+          fi
+
+          actual_version="$(npm pkg get version | tr -d '\"')"
+          test "$actual_version" = "$expected_version"
+
+          release_tag="agentware-v$expected_version"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/$release_tag"; then
+              echo "Release tag already exists: $release_tag" >&2
+              exit 1
+            fi
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git tag -a "$release_tag" -m "Agentware $expected_version" "$RELEASE_SHA"
+            git push origin "$release_tag"
+          fi
+
+          echo "release_ref=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
   stage:
+    needs: prepare
     name: Stage @haikeilabs/agentware
     runs-on: ubuntu-latest
     environment: release
@@ -23,6 +82,8 @@ jobs:
         working-directory: typescript
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.release_ref }}
 
       - uses: actions/setup-node@v6
         with:
@@ -34,9 +95,4 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test -- --runInBand
-      - name: Verify release tag matches package version
-        run: |
-          expected_version="${GITHUB_REF_NAME#agentware-v}"
-          actual_version="$(npm pkg get version | tr -d '\"')"
-          test "$actual_version" = "$expected_version"
       - run: npm stage publish
