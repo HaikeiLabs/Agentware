@@ -1,5 +1,5 @@
 {
-  "name": "@haikei/agentware",
+  "name": "@haikeilabs/agentware",
   "version": "0.1.0",
   "description": "Agent middleware and tooling for LLM tool calling",
   "main": "dist/index.js",

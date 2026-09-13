@@ -5,7 +5,7 @@ This document provides examples of how to use the TypeScript middleware for poli
 ## Installation
 
 ```bash
-npm install @haikei/agentware
+npm install @haikeilabs/agentware
 ```
 
 ## Basic Usage
@@ -13,7 +13,7 @@ npm install @haikei/agentware
 ### Creating a Policy
 
 ```typescript
-import { Policy, Rule, Action, RateLimitConfig } from '@haikei/agentware/middleware';
+import { Policy, Rule, Action, RateLimitConfig } from '@haikeilabs/agentware/middleware';
 
 const policy = new Policy({
   defaultDeny: false,
@@ -43,7 +43,7 @@ const policy = new Policy({
 ### Creating Middleware
 
 ```typescript
-import { Middleware, CallerContext, ToolResult } from '@haikei/agentware/middleware';
+import { Middleware, CallerContext, ToolResult } from '@haikeilabs/agentware/middleware';
 
 const myToolExecutor = async (toolName: string, args: Record<string, unknown>): Promise<ToolResult> => {
   // Your tool execution logic here
@@ -67,7 +67,7 @@ const result = await mw.call('read_file', { path: '/tmp/test.txt' });
 ### Using Caller Context
 
 ```typescript
-import { CallerContext } from '@haikei/agentware/middleware';
+import { CallerContext } from '@haikeilabs/agentware/middleware';
 
 // Create caller context with user information
 const callerCtx = new CallerContext({
@@ -85,7 +85,7 @@ const result = await mw.call('read_file', { path: '/tmp/test.txt' }, callerCtx);
 ### Using Audit
 
 ```typescript
-import { InMemoryAuditor } from '@haikei/agentware/middleware';
+import { InMemoryAuditor } from '@haikeilabs/agentware/middleware';
 
 // Create in-memory auditor
 const auditor = new InMemoryAuditor();
@@ -107,7 +107,7 @@ for (const entry of log) {
 ## Loading Policy from YAML
 
 ```typescript
-import { loadPolicyFromFile } from '@haikei/agentware/middleware';
+import { loadPolicyFromFile } from '@haikeilabs/agentware/middleware';
 
 // Load policy from YAML file
 const policy = loadPolicyFromFile('policy.yaml');
