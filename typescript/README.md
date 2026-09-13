@@ -1,6 +1,6 @@
-# @pedro/agentware
+# @haikei/agentware
 
-`@pedro/agentware` provides tool and agent-runtime primitives for applications
+`@haikei/agentware` provides tool and agent-runtime primitives for applications
 that already own their agent loop, channel integration, identities, and tool
 handlers.
 
@@ -11,7 +11,7 @@ boundary. It preserves the host's input, output, and trusted context types;
 Agentware does not infer identity or privileges from tool arguments.
 
 ```ts
-import { wrapTool } from "@pedro/agentware";
+import { wrapTool } from "@haikei/agentware";
 
 type Selection = { queryId: string };
 type TrustedContext = { principalId: string; verifiedGrant: string };
