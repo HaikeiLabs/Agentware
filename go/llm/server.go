@@ -100,8 +100,12 @@ func (b *serverBackend) Complete(ctx context.Context, req *Request) (*Response, 
 
 	var result struct {
 		Choices []struct {
-			Message      Message `json:"message"`
-			FinishReason string  `json:"finish_reason"`
+			Message struct {
+				Content          string     `json:"content"`
+				ReasoningContent string     `json:"reasoning_content"`
+				ToolCalls        []ToolCall `json:"tool_calls"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
 		Usage struct {
 			PromptTokens        int `json:"prompt_tokens"`
@@ -116,7 +120,6 @@ func (b *serverBackend) Complete(ctx context.Context, req *Request) (*Response, 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
-
 	log.Printf("[LLM] Got response with %d choices, usage: %d tokens", len(result.Choices), result.Usage.TotalTokens)
 	if len(result.Choices) > 0 {
 		log.Printf("[LLM] Content length: %d, ToolCalls: %d", len(result.Choices[0].Message.Content), len(result.Choices[0].Message.ToolCalls))
@@ -132,6 +135,7 @@ func (b *serverBackend) Complete(ctx context.Context, req *Request) (*Response, 
 	choice := result.Choices[0]
 	return &Response{
 		Content:      choice.Message.Content,
+		Reasoning:    choice.Message.ReasoningContent,
 		ToolCalls:    choice.Message.ToolCalls,
 		FinishReason: choice.FinishReason,
 		UsageTokens: TokenUsage{

@@ -477,3 +477,104 @@ class TestRunInference:
 
         assert result is not None
         assert result.attempts == 1
+
+
+class TestRunInferenceReasoning:
+    """Tests for AR-1 reasoning stripping and normalization in the loop."""
+
+    def _tool_def(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="test_tool",
+            description="A test tool",
+            input_schema={"type": "object", "properties": {}},
+        )
+
+    @pytest.mark.asyncio
+    async def test_strips_thinking_tags_before_tool_call_parsing(self):
+        """Reasoning embedded as thinking tags must be stripped before parsing."""
+        messages = [Message(role=Role.USER, content="test")]
+
+        mock_resp = Response(
+            content="<thinking>goal: answer\n\nobservation: the index is fresh</thinking>\n"
+            '{"tool": "test_tool", "args": {"key": "value"}}',
+            tool_calls=[],
+            finish_reason="stop",
+            usage_tokens=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+        )
+
+        backend = MockBackend(responses=[mock_resp])
+        validator = ResponseValidator(tool_names=["test_tool"], rescue_enabled=True)
+
+        cfg = InferenceConfig(
+            client=backend,
+            tool_specs=[self._tool_def()],
+            validator=validator,
+            max_attempts=3,
+        )
+
+        result = await run_inference(messages, cfg)
+
+        assert result is not None
+        assert len(result.response.tool_calls) == 1
+        assert result.response.tool_calls[0].name == "test_tool"
+
+        assert result.reasoning_tree is not None
+        assert len(result.reasoning_tree.nodes) == 2
+        for node in result.reasoning_tree.nodes:
+            assert len(node.summary) <= 512
+            assert node.summary != "goal: answer\n\nobservation: the index is fresh"
+
+    @pytest.mark.asyncio
+    async def test_native_reasoning_field(self):
+        """Native reasoning_content produces a native-format tree."""
+        messages = [Message(role=Role.USER, content="test")]
+
+        mock_resp = Response(
+            content='{"tool": "test_tool", "args": {"key": "value"}}',
+            reasoning="observation: the index is fresh\n\ndecision: call test_tool",
+            tool_calls=[],
+            finish_reason="stop",
+            usage_tokens=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+        )
+
+        backend = MockBackend(responses=[mock_resp])
+        validator = ResponseValidator(tool_names=["test_tool"], rescue_enabled=True)
+
+        cfg = InferenceConfig(
+            client=backend,
+            tool_specs=[self._tool_def()],
+            validator=validator,
+            max_attempts=3,
+        )
+
+        result = await run_inference(messages, cfg)
+
+        assert result is not None
+        assert result.reasoning_tree is not None
+        assert result.reasoning_tree.format.value == "native"
+        assert len(result.response.tool_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_fails_closed_on_unbalanced_reasoning(self):
+        """Malformed reasoning never produces a tool call from a partial parse."""
+        messages = [Message(role=Role.USER, content="test")]
+
+        mock_resp = Response(
+            content='<thinking>never closed\n{"tool": "test_tool", "args": {}}',
+            tool_calls=[],
+            finish_reason="stop",
+            usage_tokens=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+        )
+
+        backend = MockBackend(responses=[mock_resp])
+        validator = ResponseValidator(tool_names=["test_tool"], rescue_enabled=True)
+
+        cfg = InferenceConfig(
+            client=backend,
+            tool_specs=[self._tool_def()],
+            validator=validator,
+            max_attempts=3,
+        )
+
+        with pytest.raises(RetriesExhaustedError):
+            await run_inference(messages, cfg)

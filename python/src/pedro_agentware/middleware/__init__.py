@@ -1,6 +1,6 @@
 """Middleware package - Policy enforcement and auditing."""
 
-from .audit import Auditor, AuditRecord, InMemoryAuditor
+from .audit import AuditFilter, Auditor, AuditRecord, InMemoryAuditor
 from .middleware import Middleware, MiddlewareImpl
 from .policy import Condition, Operator, Policy, PolicyEvaluator, Rule, SimplePolicyEvaluator
 from .tool_client import AuditedToolClient
@@ -21,5 +21,6 @@ __all__ = [
     "SimplePolicyEvaluator",
     "Auditor",
     "AuditRecord",
+    "AuditFilter",
     "InMemoryAuditor",
 ]

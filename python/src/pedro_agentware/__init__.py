@@ -8,6 +8,7 @@ from .llm import Backend, Message
 from .llmcontext import ContextManager
 from .middleware import Auditor, Middleware, PolicyEvaluator
 from .prompts import PromptGenerator
+from .reasoning import ReasoningAdapter
 from .toolformat import ToolFormatter
 from .tools import Result, Tool, ToolRegistry
 
@@ -26,4 +27,5 @@ __all__ = [
     "ContextManager",
     "PromptGenerator",
     "ToolFormatter",
+    "ReasoningAdapter",
 ]

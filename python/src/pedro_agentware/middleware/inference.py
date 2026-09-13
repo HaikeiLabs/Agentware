@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
+from typing import Any
 
 from pedro_agentware.llm import Message, Role
 from pedro_agentware.llm.backend import Backend
@@ -19,12 +20,19 @@ from pedro_agentware.middleware.guardrails.response_validator import (
 )
 from pedro_agentware.middleware.guardrails.step_enforcer import StepEnforcer
 from pedro_agentware.middleware.types import MessageMeta, MessageType
+from pedro_agentware.reasoning import ContextTree, ReasoningAdapter, ReasoningError
 
 
 class RetriesExhaustedError(Exception):
     """Raised when inference attempts are exhausted."""
 
     pass
+
+
+# default_adapter strips and normalizes reasoning in the inference loop.
+# Callers can supply a tuned adapter (limits, registered model fields) via
+# InferenceConfig.reasoning.
+default_adapter = ReasoningAdapter()
 
 
 @dataclass
@@ -35,6 +43,7 @@ class InferenceResult:
     new_messages: list[Message]
     tool_call_counter: int
     attempts: int
+    reasoning_tree: ContextTree | None = None
 
 
 @dataclass
@@ -49,6 +58,7 @@ class InferenceConfig:
     tool_specs: list[ToolDefinition] = field(default_factory=list)
     max_attempts: int = 10
     step_index: int = 0
+    reasoning: ReasoningAdapter | None = None
 
 
 def _get_tool_names(specs: list[ToolDefinition]) -> list[str]:
@@ -102,14 +112,16 @@ async def run_inference(
 
         tool_specs_serialized = []
         for spec in cfg.tool_specs:
-            tool_specs_serialized.append({
-                "type": "function",
-                "function": {
-                    "name": spec.name,
-                    "description": spec.description,
-                    "parameters": spec.input_schema,
-                },
-            })
+            tool_specs_serialized.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": spec.name,
+                        "description": spec.description,
+                        "parameters": spec.input_schema,
+                    },
+                }
+            )
 
         try:
             resp = await asyncio.get_event_loop().run_in_executor(
@@ -129,40 +141,73 @@ async def run_inference(
 
         if cfg.context_manager is not None and resp.usage_tokens.total_tokens > 0:
             cfg.context_manager.update_token_count(resp.usage_tokens.total_tokens)
-
         validation_result: ValidationResult | None = None
 
-        if resp.tool_calls:
-            guardrails_tool_calls = [
-                GuardrailsToolCall(tool=tc.name, args=tc.arguments)
-                for tc in resp.tool_calls
-            ]
-            if cfg.validator:
-                validation_result = cfg.validator.validate_tool_calls(guardrails_tool_calls)
-            else:
-                validation_result = ValidationResult(
-                    tool_calls=guardrails_tool_calls, nudge=None, needs_retry=False
+        # AR-1: normalize reasoning and strip it before ordinary tool-call
+        # parsing. Reasoning can arrive as a native reasoning_content field or
+        # as embedded thinking tags in content; both are combined into a
+        # synthetic structured input so the adapter sees the full picture.
+        # Malformed or unbounded reasoning fails closed: this turn is treated
+        # as invalid and retried rather than parsed partially.
+        reasoning_tree: ContextTree | None = None
+        clean_content = resp.content
+        reasoning_failed = False
+        if resp.content or resp.reasoning:
+            reasoning_input: dict[str, Any] = {"content": resp.content}
+            if resp.reasoning:
+                reasoning_input["reasoning_content"] = resp.reasoning
+            r_adapter = cfg.reasoning or default_adapter
+            try:
+                reasoning_tree = r_adapter.extract(
+                    reasoning_input,
+                    cfg.client.model_name(),
+                    "llm-backend",
                 )
-        elif resp.content:
-            if cfg.validator:
-                validation_result = cfg.validator.validate_text_response(resp.content)
-            else:
-                validation_result = ValidationResult(tool_calls=[], nudge=None, needs_retry=False)
-
-            if not validation_result.needs_retry and validation_result.tool_calls:
-                resp.tool_calls = [
-                    LLMToolCall(id="", name=tc.tool, arguments=tc.args)
-                    for tc in validation_result.tool_calls
-                ]
-        else:
-            if cfg.validator:
-                validation_result = cfg.validator.validate_text_response("")
-            else:
+                clean_content = r_adapter.strip(reasoning_input)
+            except ReasoningError:
+                reasoning_failed = True
+                # Fail closed: never echo content that may carry reasoning we
+                # could not parse.
+                clean_content = ""
                 validation_result = ValidationResult(
                     tool_calls=[],
                     nudge=None,
                     needs_retry=True,
                 )
+
+        if not reasoning_failed:
+            if resp.tool_calls:
+                guardrails_tool_calls = [
+                    GuardrailsToolCall(tool=tc.name, args=tc.arguments) for tc in resp.tool_calls
+                ]
+                if cfg.validator:
+                    validation_result = cfg.validator.validate_tool_calls(guardrails_tool_calls)
+                else:
+                    validation_result = ValidationResult(
+                        tool_calls=guardrails_tool_calls, nudge=None, needs_retry=False
+                    )
+            elif clean_content:
+                if cfg.validator:
+                    validation_result = cfg.validator.validate_text_response(clean_content)
+                else:
+                    validation_result = ValidationResult(
+                        tool_calls=[], nudge=None, needs_retry=False
+                    )
+
+                if not validation_result.needs_retry and validation_result.tool_calls:
+                    resp.tool_calls = [
+                        LLMToolCall(id="", name=tc.tool, arguments=tc.args)
+                        for tc in validation_result.tool_calls
+                    ]
+            else:
+                if cfg.validator:
+                    validation_result = cfg.validator.validate_text_response("")
+                else:
+                    validation_result = ValidationResult(
+                        tool_calls=[],
+                        nudge=None,
+                        needs_retry=True,
+                    )
 
         last_response = resp
 
@@ -191,6 +236,7 @@ async def run_inference(
                 new_messages=current_messages,
                 tool_call_counter=tool_call_counter,
                 attempts=attempts,
+                reasoning_tree=reasoning_tree,
             )
 
         if cfg.error_tracker is not None:
@@ -215,7 +261,7 @@ async def run_inference(
 
         failed_msg = Message(
             role=Role.ASSISTANT,
-            content=resp.content,
+            content=clean_content,
             meta=MessageMeta(type=MessageType.TEXT_RESPONSE),
         )
         current_messages.append(failed_msg)

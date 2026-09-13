@@ -4,6 +4,8 @@ This document defines the contract between a third-party harness and the `pedro-
 
 **Product thesis**: "Bring your own agent." This contract enables any third party to build a harness against this library alone, without reverse-engineering existing implementations.
 
+> **Boundary:** agentware models bindings, opaque auth references, local policy, and delegation — it never grants permission from bindings, resolves connector secrets, executes providers, or depends on Kei/ABAC to run a governed local loop. See [`action-tool-boundary.md`](action-tool-boundary.md).
+
 ---
 
 ## What a Harness Must Implement
@@ -162,6 +164,32 @@ The library enforces fail-closed security. All of these result in **DENY**:
 | Unreachable proxy | DENY - cannot bypass policy |
 | Missing credential | DENY - no token, no access |
 | Expired token | DENY - renewal must succeed |
+
+---
+
+## Control-Plane Boundary
+
+The harness runs **on the tenant side**; Kei is a **metadata-only control
+plane**. Everything the harness sends to Kei — and everything agentware sends on
+its behalf — is metadata; customer data never crosses the boundary. See
+`docs/tenant-proxy-reference.md` for the authoritative architecture and search
+the shared Herdr wiki (`wiki search "tenant data distributed proxy"`) before
+changing this contract.
+
+- **Non-secret metadata only.** `tool_bindings` (tool → connector routing) and
+  `secret_refs` (opaque reference identifiers) are metadata; they grant no
+  permissions and are never resolved to credentials by the library. The
+  bootstrap secret (`KEI_HARNESS_TOKEN`) is loaded separately from the
+  environment or a secret provider and is rejected from any manifest.
+- **The proxy is the enforcement boundary.** Governed external operations go
+  through the proxy, which is the connector/provider runtime and policy
+  enforcement point. The local middleware chain evaluates policy and audits
+  locally and fails closed.
+- **ABAC is a decision point.** ABAC is called for metadata policy decisions
+  only — it decides; it never executes writes and never serves/store
+  credentials.
+- **Never in Kei.** Provider payloads and results, customer content,
+  credentials, embeddings, and indexes never enter the control plane.
 
 ---
 

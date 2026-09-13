@@ -2,7 +2,13 @@ package llm
 
 // Response is the output from a completion.
 type Response struct {
-	Content      string
+	Content string
+	// Reasoning is the raw reasoning the backend returned on a separate
+	// channel (e.g. reasoning_content for DeepSeek-style models) when the
+	// backend captures it. It is never written into Content, never returned to
+	// the end user, and never recorded on a default audit record; consumers
+	// normalize it with the reasoning adapter (go/reasoning).
+	Reasoning    string
 	ToolCalls    []ToolCall
 	FinishReason string
 	UsageTokens  TokenUsage

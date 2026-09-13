@@ -1,17 +1,17 @@
-import type { Tool } from "./tool.js";
+import type { AnyTool } from "./tool.js";
 
 export class ToolRegistry {
-  private tools: Map<string, Tool> = new Map();
+  private tools: Map<string, AnyTool> = new Map();
 
-  register(tool: Tool): void {
+  register(tool: AnyTool): void {
     this.tools.set(tool.name, tool);
   }
 
-  get(name: string): Tool | undefined {
+  get(name: string): AnyTool | undefined {
     return this.tools.get(name);
   }
 
-  all(): Tool[] {
+  all(): AnyTool[] {
     return Array.from(this.tools.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );

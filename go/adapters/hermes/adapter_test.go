@@ -589,8 +589,8 @@ func TestGetCallerContext_WithoutContext(t *testing.T) {
 
 	result := getCallerContext(ctx)
 
-	if !result.Trusted {
-		t.Error("expected default trusted to be true")
+	if result.Trusted {
+		t.Error("expected default trusted to be false (fail-closed)")
 	}
 }
 

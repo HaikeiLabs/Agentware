@@ -8,6 +8,7 @@ import type { ResponseValidator, ToolCall, ValidationResult } from "./guardrails
 import { ErrorTracker, ErrorCategory } from "./guardrails/error_tracker.js";
 import { StepEnforcer } from "./guardrails/step_enforcer.js";
 import { stepNudge } from "./guardrails/nudge.js";
+import { ReasoningAdapter, ReasoningError, type ContextTree } from "../reasoning/index.js";
 
 export class RetriesExhaustedError extends Error {
   constructor(message: string) {
@@ -21,6 +22,10 @@ export interface InferenceResult {
   newMessages: Message[];
   toolCallCounter: number;
   attempts: number;
+  /** Normalized context tree for the final turn's reasoning (native
+   * reasoning_content and/or thinking tags). Null when the turn carried no
+   * reasoning. Holds bounded summaries only; raw reasoning is never attached. */
+  reasoningTree: ContextTree | null;
 }
 
 export interface InferenceConfig {
@@ -32,7 +37,13 @@ export interface InferenceConfig {
   toolSpecs: ToolDefinition[];
   maxAttempts: number;
   stepIndex?: number;
+  /** Optional reasoning adapter override for limits and registered model
+   * fields. */
+  reasoning?: ReasoningAdapter;
 }
+
+// Default adapter strips and normalizes reasoning in the inference loop.
+const defaultAdapter = new ReasoningAdapter();
 
 export async function runInference(
   messages: Message[],
@@ -87,42 +98,79 @@ export async function runInference(
 
     let validationResult: ValidationResult | null = null;
 
-    if (resp.tool_calls && resp.tool_calls.length > 0) {
-      const guardrailsToolCalls: ToolCall[] = resp.tool_calls.map((tc) => ({
-        tool: tc.name,
-        args: tc.arguments,
-      }));
-      if (cfg.validator) {
-        validationResult = cfg.validator.validateToolCalls(guardrailsToolCalls);
-      } else {
-        validationResult = {
-          toolCalls: guardrailsToolCalls,
-          nudge: null,
-          needsRetry: false,
-        };
+    // AR-1: normalize reasoning and strip it before ordinary tool-call
+    // parsing. Reasoning can arrive as a native reasoning_content field or as
+    // embedded thinking tags in content; both are combined into a synthetic
+    // structured input so the adapter sees the full picture. Malformed or
+    // unbounded reasoning fails closed: this turn is treated as invalid and
+    // retried rather than parsed partially.
+    let reasoningTree: ContextTree | null = null;
+    let cleanContent = resp.content;
+    let reasoningFailed = false;
+    if (resp.content || resp.reasoning) {
+      const reasoningInput: Record<string, unknown> = { content: resp.content };
+      if (resp.reasoning) {
+        reasoningInput["reasoning_content"] = resp.reasoning;
       }
-    } else if (resp.content) {
-      if (cfg.validator) {
-        validationResult = cfg.validator.validateTextResponse(resp.content);
-      } else {
-        validationResult = { toolCalls: [], nudge: null, needsRetry: false };
+      const adapter = cfg.reasoning ?? defaultAdapter;
+      try {
+        reasoningTree = adapter.extract(reasoningInput, cfg.client.modelName(), "llm-backend");
+        cleanContent = adapter.strip(reasoningInput);
+      } catch (e) {
+        if (e instanceof ReasoningError) {
+          reasoningFailed = true;
+          // Fail closed: never echo content that may carry reasoning we could
+          // not parse.
+          cleanContent = "";
+          validationResult = {
+            toolCalls: [],
+            nudge: null,
+            needsRetry: true,
+          };
+        } else {
+          throw e;
+        }
       }
+    }
 
-      if (!validationResult.needsRetry && validationResult.toolCalls.length > 0) {
-        resp.tool_calls = validationResult.toolCalls.map(
-          (tc) =>
-            ({
-              id: "",
-              name: tc.tool,
-              arguments: tc.args,
-            } as LlmToolCall)
-        );
-      }
-    } else {
-      if (cfg.validator) {
-        validationResult = cfg.validator.validateTextResponse("");
+    if (!reasoningFailed) {
+      if (resp.tool_calls && resp.tool_calls.length > 0) {
+        const guardrailsToolCalls: ToolCall[] = resp.tool_calls.map((tc) => ({
+          tool: tc.name,
+          args: tc.arguments,
+        }));
+        if (cfg.validator) {
+          validationResult = cfg.validator.validateToolCalls(guardrailsToolCalls);
+        } else {
+          validationResult = {
+            toolCalls: guardrailsToolCalls,
+            nudge: null,
+            needsRetry: false,
+          };
+        }
+      } else if (cleanContent) {
+        if (cfg.validator) {
+          validationResult = cfg.validator.validateTextResponse(cleanContent);
+        } else {
+          validationResult = { toolCalls: [], nudge: null, needsRetry: false };
+        }
+
+        if (!validationResult.needsRetry && validationResult.toolCalls.length > 0) {
+          resp.tool_calls = validationResult.toolCalls.map(
+            (tc) =>
+              ({
+                id: "",
+                name: tc.tool,
+                arguments: tc.args,
+              } as LlmToolCall)
+          );
+        }
       } else {
-        validationResult = { toolCalls: [], nudge: null, needsRetry: true };
+        if (cfg.validator) {
+          validationResult = cfg.validator.validateTextResponse("");
+        } else {
+          validationResult = { toolCalls: [], nudge: null, needsRetry: true };
+        }
       }
     }
 
@@ -155,6 +203,7 @@ export async function runInference(
         newMessages: currentMessages,
         toolCallCounter,
         attempts,
+        reasoningTree,
       };
     }
 
@@ -183,7 +232,7 @@ export async function runInference(
 
     const failedMsg: Message = {
       role: Role.ASSISTANT,
-      content: resp.content,
+      content: cleanContent,
       meta: { type: MessageType.TEXT_RESPONSE },
     };
     currentMessages.push(failedMsg);

@@ -27,6 +27,7 @@ class Response:
     """Output from a completion."""
 
     content: str = ""
+    reasoning: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
     finish_reason: str = ""
     usage_tokens: TokenUsage = field(default_factory=TokenUsage)

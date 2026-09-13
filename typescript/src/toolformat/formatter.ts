@@ -1,4 +1,4 @@
-import type { Tool, Result } from "../tools/index.js";
+import type { AnyTool, Result } from "../tools/index.js";
 
 export interface ParsedToolCall {
   id: string;
@@ -8,14 +8,14 @@ export interface ParsedToolCall {
 }
 
 export interface ToolFormatter {
-  formatToolDefinitions(tools: Tool[]): string;
+  formatToolDefinitions(tools: AnyTool[]): string;
   parseToolCalls(response: string): ParsedToolCall[];
   formatToolResult(name: string, result: Result): string;
   modelFamily(): string;
 }
 
 export class GenericFormatter implements ToolFormatter {
-  formatToolDefinitions(tools: Tool[]): string {
+  formatToolDefinitions(tools: AnyTool[]): string {
     if (tools.length === 0) return "No tools available.";
 
     const lines = ["Available tools:"];

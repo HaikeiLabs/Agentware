@@ -3,7 +3,7 @@
 **Status**: Living Document — v0.1 Draft  
 **Repo**: github.com/Soypete/pedro-agentware  
 **Author**: SoypeteTech  
-**Last Updated**: April 2026
+**Last Updated**: September 2026
 
 ---
 
@@ -20,6 +20,7 @@
 9. [Extension Points](#9-extension-points)
 10. [Versioning & Stability Contract](#10-versioning--stability-contract)
 11. [Contributing Guidelines](#11-contributing-guidelines)
+12. [Tenant-Side Distributed Proxy & Control-Plane Boundary](#12-tenant-side-distributed-proxy--control-plane-boundary)
 
 ---
 
@@ -787,3 +788,53 @@ New top-level packages require an ADR in `docs/adr/` before implementation.
 - [ ] `go vet ./...` passes
 - [ ] Tests added for new behavior
 - [ ] CHANGELOG.md updated
+
+---
+
+## 12. Tenant-Side Distributed Proxy & Control-Plane Boundary
+
+> Before changing middleware, tool bindings, or the `kei/` surface, read the
+> canonical `docs/tenant-proxy-reference.md` and search the shared Herdr wiki
+> (`wiki search "tenant data distributed proxy"`). This section is the
+> abbreviated contract every design change must preserve.
+
+### Roles in one sentence
+
+**Agentware** is the tenant-side execution layer (local tool middleware,
+delegation, semantic tool bindings, and proxy integration). **The distributed
+proxy** is the connector/provider runtime and the policy enforcement point for
+governed external operations. **Kei** is a metadata-only control plane:
+registration, auth method and *references*, tool bindings, scopes/resources,
+and audit metadata. **ABAC** is a metadata policy decision point only.
+
+### Metadata-only invariant
+
+- `tool_bindings` and `secret_refs` are **non-secret metadata**. They are
+  routing/reference identifiers, never permissions, and never materialized
+  credentials. The bootstrap secret is rejected from any manifest
+  (`python/src/pedro_agentware/kei/config.py` fails closed on this).
+- **ABAC is called for metadata policy decisions only**: subject/object/
+  operation/environment over data-source resources. ABAC **decides**; it does
+  **not** execute writes and does **not** serve or store credentials.
+- Provider payloads/results, customer content, credentials, embeddings, and
+  indexes **never enter Kei**.
+
+### Execution topology
+
+- **Local agent execution** stays fully possible **without a direct ABAC
+  connector dependency**: the local middleware chain evaluates policy and
+  audits locally, fail-closed by default.
+- **Governed external operations** — actions that cross out of the tenant to
+  connectors/providers — use the **proxy boundary**: the proxy resolves
+  bindings/auth from control-plane metadata (references, not credentials),
+  invokes provider adapters, and returns data only inside the tenant runtime.
+  Mutations such as GitHub/CRM/Linear writes are agent capabilities executed in
+  the harness/agentware/agents local tool loop; the proxy is the explicit
+  approval/governance boundary for them.
+
+### Contraindications
+
+- Do not describe ABAC as a credential or data service.
+- Do not describe agentware as sending customer data through the control plane.
+- Do not put provider payloads, results, content, credentials, embeddings, or
+  indexes into Kei metadata.

@@ -1,10 +1,15 @@
-export { Tool, BaseTool, Result, ToolExample } from "./tool.js";
-export { ToolRegistry } from "./registry.js";
 export {
-  wrapTool,
-  ToolAbortedError,
-  ToolTimeoutError,
-} from "./async.js";
+  Tool,
+  ToolBase,
+  AsyncTool,
+  AnyTool,
+  BaseTool,
+  Result,
+  ToolExample,
+  executeTool,
+} from "./tool.js";
+export { ToolRegistry } from "./registry.js";
+export { wrapTool, ToolAbortedError, ToolTimeoutError } from "./async.js";
 export type {
   AsyncToolHandler,
   ToolInvocationOptions,

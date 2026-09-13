@@ -1,7 +1,27 @@
-export interface Tool {
+export interface ToolBase {
   readonly name: string;
   readonly description: string;
+}
+
+export interface Tool extends ToolBase {
   execute(args: Record<string, unknown>): Result;
+}
+
+export interface AsyncTool extends ToolBase {
+  execute(args: Record<string, unknown>): Promise<Result>;
+}
+
+export type AnyTool = Tool | AsyncTool;
+
+export async function executeTool(
+  tool: AnyTool,
+  args: Record<string, unknown>
+): Promise<Result> {
+  const result = tool.execute(args);
+  if (result instanceof Promise) {
+    return result;
+  }
+  return result;
 }
 
 export interface ToolExample {

@@ -9,13 +9,24 @@ from .types import Action, Decision
 
 @dataclass
 class AuditRecord:
-    """Record of a tool call decision."""
+    """Record of a tool call decision.
+
+    The delegation fields mirror ``middleware.CallerContext``: ``invoking_subject``
+    is the human who originated the request, carried unchanged across every
+    delegation hop; ``parent_span`` and ``delegation_depth`` record where in the
+    chain the call was made; ``framework`` names the adapter/harness that
+    originated the call.
+    """
 
     session_id: str
     tool_name: str
     args: dict[str, Any]
     decision: Decision
     timestamp: datetime = field(default_factory=datetime.now)
+    invoking_subject: str = ""
+    parent_span: str = ""
+    delegation_depth: int = 0
+    framework: str = ""
 
 
 class AuditFilter:
@@ -28,12 +39,16 @@ class AuditFilter:
         action: Action | None = None,
         since: datetime | None = None,
         limit: int = 0,
+        parent_span: str = "",
+        invoking_subject: str = "",
     ) -> None:
         self.session_id = session_id
         self.tool_name = tool_name
         self.action = action
         self.since = since
         self.limit = limit
+        self.parent_span = parent_span
+        self.invoking_subject = invoking_subject
 
 
 class Auditor(Protocol):
@@ -69,6 +84,13 @@ class InMemoryAuditor:
             if filter.action and r.decision.action != filter.action:
                 continue
             if filter.since and r.timestamp < filter.since:
+                continue
+            if getattr(filter, "parent_span", "") and r.parent_span != filter.parent_span:
+                continue
+            if (
+                getattr(filter, "invoking_subject", "")
+                and r.invoking_subject != filter.invoking_subject
+            ):
                 continue
             results.append(r)
             if filter.limit > 0 and len(results) >= filter.limit:

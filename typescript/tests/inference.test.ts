@@ -5,6 +5,7 @@ import { ContextWindowManager } from "../src/llmcontext/context_window.js";
 import { ResponseValidator } from "../src/middleware/guardrails/response_validator.js";
 import { ErrorTracker } from "../src/middleware/guardrails/error_tracker.js";
 import { StepEnforcer } from "../src/middleware/guardrails/step_enforcer.js";
+import { Format } from "../src/reasoning/index.js";
 import {
   InferenceConfig,
   RetriesExhaustedError,
@@ -21,10 +22,12 @@ interface MockBackend {
 function createMockResponse(
   content: string,
   toolCalls: LlmToolCall[] = [],
-  usageTokens?: TokenUsage
+  usageTokens?: TokenUsage,
+  reasoning = ""
 ): Response {
   return {
     content,
+    reasoning,
     tool_calls: toolCalls,
     finish_reason: toolCalls.length > 0 ? "tool_calls" : "stop",
     usage_tokens: usageTokens ?? {
@@ -374,5 +377,96 @@ describe("runInference", () => {
 
     expect(result).not.toBeNull();
     expect(result!.attempts).toBe(1);
+  });
+
+  describe("AR-1 reasoning", () => {
+    it("strips thinking tags before tool-call parsing and attaches a tree", async () => {
+      const messages: Message[] = [{ role: Role.USER, content: "test" }];
+      const toolDef = createToolDefinition("test_tool");
+
+      mockResponses = [
+        createMockResponse(
+          "<thinking>goal: answer\n\nobservation: the index is fresh</thinking>\n" +
+            '{"tool": "test_tool", "args": {"key": "value"}}'
+        ),
+      ];
+
+      const backend = createMockBackend();
+      const validator = new ResponseValidator(["test_tool"], true);
+
+      const cfg: InferenceConfig = {
+        client: backend,
+        toolSpecs: [toolDef],
+        validator,
+        maxAttempts: 3,
+        stepIndex: 0,
+      };
+
+      const result = await runInference(messages, cfg);
+
+      expect(result).not.toBeNull();
+      expect(result!.response.tool_calls).toHaveLength(1);
+      expect(result!.response.tool_calls[0].name).toBe("test_tool");
+
+      expect(result!.reasoningTree).not.toBeNull();
+      expect(result!.reasoningTree!.nodes).toHaveLength(2);
+      for (const node of result!.reasoningTree!.nodes) {
+        expect(Array.from(node.summary).length).toBeLessThanOrEqual(512);
+        expect(node.summary).not.toBe("goal: answer\n\nobservation: the index is fresh");
+      }
+    });
+
+    it("builds a native-format tree from reasoning_content", async () => {
+      const messages: Message[] = [{ role: Role.USER, content: "test" }];
+      const toolDef = createToolDefinition("test_tool");
+
+      mockResponses = [
+        createMockResponse(
+          '{"tool": "test_tool", "args": {"key": "value"}}',
+          [],
+          undefined,
+          "observation: the index is fresh\n\ndecision: call test_tool"
+        ),
+      ];
+
+      const backend = createMockBackend();
+      const validator = new ResponseValidator(["test_tool"], true);
+
+      const cfg: InferenceConfig = {
+        client: backend,
+        toolSpecs: [toolDef],
+        validator,
+        maxAttempts: 3,
+        stepIndex: 0,
+      };
+
+      const result = await runInference(messages, cfg);
+
+      expect(result).not.toBeNull();
+      expect(result!.reasoningTree?.format).toBe(Format.NATIVE);
+      expect(result!.response.tool_calls).toHaveLength(1);
+    });
+
+    it("fails closed on unbalanced reasoning", async () => {
+      const messages: Message[] = [{ role: Role.USER, content: "test" }];
+      const toolDef = createToolDefinition("test_tool");
+
+      mockResponses = [
+        createMockResponse("<thinking>never closed\n" + '{"tool": "test_tool", "args": {}}'),
+      ];
+
+      const backend = createMockBackend();
+      const validator = new ResponseValidator(["test_tool"], true);
+
+      const cfg: InferenceConfig = {
+        client: backend,
+        toolSpecs: [toolDef],
+        validator,
+        maxAttempts: 3,
+        stepIndex: 0,
+      };
+
+      await expect(runInference(messages, cfg)).rejects.toThrow(RetriesExhaustedError);
+    });
   });
 });

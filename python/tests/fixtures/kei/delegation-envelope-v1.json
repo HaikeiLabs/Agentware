@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "invoking_subject": "U_HUMAN",
+  "organization": "acme-corp",
+  "workspace": "ws-sales-pipeline",
+  "agent_id": "agent-gh-bot",
+  "connector_id": "github-connector",
+  "capability": "github.issue.write",
+  "action": "execute",
+  "resource": "github:repo:acme-corp/sales-pipeline",
+  "trace_id": "trace-2f8a9c",
+  "approval_id": "apr-2026-0007"
+}

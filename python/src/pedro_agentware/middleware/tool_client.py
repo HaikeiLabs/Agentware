@@ -89,6 +89,10 @@ class AuditedToolClient:
         self.auditor.record(
             AuditRecord(
                 session_id=caller.session_id,
+                invoking_subject=caller.invoking_subject,
+                parent_span=caller.parent_span,
+                delegation_depth=caller.delegation_depth,
+                framework=self.source,
                 tool_name=tool_name,
                 args=tool_args,
                 decision=decision,

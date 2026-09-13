@@ -6,15 +6,26 @@ import (
 
 	"github.com/soypete/pedro-agentware/go/llm"
 	"github.com/soypete/pedro-agentware/go/middleware/guardrails"
+	"github.com/soypete/pedro-agentware/go/reasoning"
 )
 
 var ErrRetriesExhausted = errors.New("retries exhausted")
+
+// defaultReasoningAdapter strips and normalizes reasoning in the inference
+// loop. Callers can supply a tuned adapter (limits, registered model fields)
+// via InferenceConfig.Reasoning.
+var defaultReasoningAdapter = reasoning.New()
 
 type InferenceResult struct {
 	Response        llm.Response
 	NewMessages     []llm.Message
 	ToolCallCounter int
 	Attempts        int
+	// ReasoningTree is the normalized context tree for the final turn's
+	// reasoning (native reasoning_content and/or thinking tags). It is nil
+	// when the turn carried no reasoning. It holds bounded summaries only;
+	// raw reasoning is never attached.
+	ReasoningTree *reasoning.ContextTree
 }
 
 type InferenceConfig struct {
@@ -26,6 +37,9 @@ type InferenceConfig struct {
 	ToolSpecs      []llm.ToolDefinition
 	MaxAttempts    int
 	StepIndex      int
+	// Reasoning optionally overrides the reasoning adapter used to strip
+	// reasoning before tool-call parsing and to build the context tree.
+	Reasoning *reasoning.Adapter
 }
 
 func RunInference(ctx context.Context, messages []llm.Message, cfg InferenceConfig) (*InferenceResult, error) {
@@ -80,32 +94,70 @@ func RunInference(ctx context.Context, messages []llm.Message, cfg InferenceConf
 
 		var validationResult guardrails.ValidationResult
 
-		if len(resp.ToolCalls) > 0 {
-			toolCalls := make([]guardrails.ToolCall, len(resp.ToolCalls))
-			for i, tc := range resp.ToolCalls {
-				toolCalls[i] = guardrails.ToolCall{
-					Tool: tc.Name,
-					Args: tc.Args,
+		// AR-1: normalize reasoning and strip it before ordinary tool-call
+		// parsing. Reasoning can arrive as a native reasoning_content field or
+		// as embedded thinking tags in content; both are combined into a
+		// synthetic structured input so the adapter sees the full picture.
+		// Malformed or unbounded reasoning fails closed: this turn is treated
+		// as invalid and retried rather than parsed partially.
+		var reasoningTree *reasoning.ContextTree
+		cleanContent := resp.Content
+		reasoningFailed := false
+		if resp.Content != "" || resp.Reasoning != "" {
+			in := map[string]any{"content": resp.Content}
+			if resp.Reasoning != "" {
+				in["reasoning_content"] = resp.Reasoning
+			}
+			rAdapter := defaultReasoningAdapter
+			if cfg.Reasoning != nil {
+				rAdapter = cfg.Reasoning
+			}
+			var rerr error
+			reasoningTree, rerr = rAdapter.Extract(in, cfg.Client.ModelName(), "llm-backend")
+			if rerr == nil {
+				cleanContent, rerr = rAdapter.Strip(in)
+			}
+			if rerr != nil {
+				reasoningFailed = true
+				// Fail closed: never echo content that may carry reasoning
+				// we could not parse.
+				cleanContent = ""
+				validationResult = guardrails.ValidationResult{
+					ToolCalls:  nil,
+					Nudge:      guardrails.RetryNudge("malformed reasoning output", getToolNames(cfg.ToolSpecs)),
+					NeedsRetry: true,
 				}
 			}
-			validationResult = cfg.Validator.ValidateToolCalls(toolCalls)
-		} else if resp.Content != "" {
-			validationResult = cfg.Validator.ValidateTextResponse(resp.Content)
-			if !validationResult.NeedsRetry && len(validationResult.ToolCalls) > 0 {
-				resp.ToolCalls = make([]llm.ToolCall, len(validationResult.ToolCalls))
-				for i, tc := range validationResult.ToolCalls {
-					resp.ToolCalls[i] = llm.ToolCall{
-						ID:   "",
-						Name: tc.Tool,
+		}
+
+		if !reasoningFailed {
+			if len(resp.ToolCalls) > 0 {
+				toolCalls := make([]guardrails.ToolCall, len(resp.ToolCalls))
+				for i, tc := range resp.ToolCalls {
+					toolCalls[i] = guardrails.ToolCall{
+						Tool: tc.Name,
 						Args: tc.Args,
 					}
 				}
-			}
-		} else {
-			validationResult = guardrails.ValidationResult{
-				ToolCalls:  nil,
-				Nudge:      guardrails.RetryNudge("empty response", getToolNames(cfg.ToolSpecs)),
-				NeedsRetry: true,
+				validationResult = cfg.Validator.ValidateToolCalls(toolCalls)
+			} else if cleanContent != "" {
+				validationResult = cfg.Validator.ValidateTextResponse(cleanContent)
+				if !validationResult.NeedsRetry && len(validationResult.ToolCalls) > 0 {
+					resp.ToolCalls = make([]llm.ToolCall, len(validationResult.ToolCalls))
+					for i, tc := range validationResult.ToolCalls {
+						resp.ToolCalls[i] = llm.ToolCall{
+							ID:   "",
+							Name: tc.Tool,
+							Args: tc.Args,
+						}
+					}
+				}
+			} else {
+				validationResult = guardrails.ValidationResult{
+					ToolCalls:  nil,
+					Nudge:      guardrails.RetryNudge("empty response", getToolNames(cfg.ToolSpecs)),
+					NeedsRetry: true,
+				}
 			}
 		}
 
@@ -139,6 +191,7 @@ func RunInference(ctx context.Context, messages []llm.Message, cfg InferenceConf
 				NewMessages:     currentMessages,
 				ToolCallCounter: toolCallCounter,
 				Attempts:        attempt,
+				ReasoningTree:   reasoningTree,
 			}, nil
 		}
 
@@ -163,7 +216,7 @@ func RunInference(ctx context.Context, messages []llm.Message, cfg InferenceConf
 
 		failedMsg := llm.Message{
 			Role:    llm.RoleAssistant,
-			Content: resp.Content,
+			Content: cleanContent,
 			Meta: llm.MessageMeta{
 				Type: llm.MessageTypeTextResponse,
 			},
