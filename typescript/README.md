@@ -43,3 +43,22 @@ Register only the wrapped handler with an agent framework or tool registry.
 Keep channel ingress, identity verification, delegated credentials, and
 domain-specific authorization in the host application. Agentware is not a
 policy engine; a policy gate can wrap this same boundary later.
+
+## Maintainer releases
+
+Releases are deliberately manual and use npm staged publishing. Do not run
+`npm publish` from a workstation or add a registry token to CI.
+
+1. Update `typescript/package.json` and `typescript/package-lock.json` to the
+   intended semantic version in a pull request, then merge it to `main`.
+2. In GitHub Actions, run **Stage Agentware npm package** from `main`, entering
+   that exact version (for example, `0.1.1`). The workflow verifies the version,
+   creates the immutable `agentware-v<version>` tag, runs checks, and submits
+   the package with `npm stage publish`.
+3. Approve the GitHub `release` environment when prompted.
+4. Review the staged package in npm and approve it. The approving maintainer
+   needs npm publish access and 2FA enabled for write actions; a WebAuthn
+   security key is supported.
+
+The final npm approval is intentional: it is the human gate that makes the
+staged version publicly available.
