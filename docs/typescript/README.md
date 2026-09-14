@@ -26,7 +26,7 @@ import {
   Policy,
   Rule,
   SimplePolicyEvaluator,
-} from "@haikeilabs/agentware/middleware";
+} from "@haikeilabs/agentware";
 
 const policy: Policy = {
   default_deny: false,
@@ -57,7 +57,7 @@ import {
   CallerContext,
   MiddlewareImpl,
   ToolExecutor,
-} from "@haikeilabs/agentware/middleware";
+} from "@haikeilabs/agentware";
 
 const executor: ToolExecutor = {
   execute(toolName: string, args: Record<string, unknown>): [unknown, boolean, string] {
@@ -93,7 +93,7 @@ const [result, success, error] = mw.execute("read_file", { path: "/tmp/test.txt"
 ### Using Audit
 
 ```typescript
-import { AuditFilter, InMemoryAuditor } from "@haikeilabs/agentware/middleware";
+import { AuditFilter, InMemoryAuditor } from "@haikeilabs/agentware";
 
 const auditor = new InMemoryAuditor();
 const mw = new MiddlewareImpl(executor).withPolicy(evaluator).withAuditor(auditor);
