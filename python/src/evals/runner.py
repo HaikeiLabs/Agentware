@@ -12,6 +12,14 @@ from typing import Any
 from evals.models import ModelBackend, create_model_client
 
 
+class EndpointUnavailableError(RuntimeError):
+    """Raised when the configured model endpoint cannot be reached.
+
+    Surfaced instead of scoring every case as a failure, so a blocked model
+    run is never mistaken for a completed one.
+    """
+
+
 @dataclass
 class EvalCase:
     name: str
@@ -21,6 +29,73 @@ class EvalCase:
     tools: list[dict[str, Any]]
     expected_tool: str
     max_turns: int = 10
+    # Optional argument assertions, checked only when set. Existing suites
+    # that assert tool selection alone keep their behaviour.
+    expected_args: dict[str, Any] = field(default_factory=dict)
+    """Arguments that must be present with exactly these values."""
+    required_arg_keys: list[str] = field(default_factory=list)
+    """Argument names that must be present, whatever their value."""
+    forbidden_arg_keys: list[str] = field(default_factory=list)
+    """Argument names that must NOT appear (e.g. proxy-delegated scoping)."""
+
+
+def validate_tool_call(
+    case: EvalCase, tool_name: str, raw_arguments: str
+) -> tuple[bool, str]:
+    """Check a tool call against the case's schema and argument assertions.
+
+    Returns ``(ok, reason)``. Validates, in order: the tool name, that the
+    arguments parse as a JSON object, that they satisfy the called tool's
+    declared ``required`` schema fields and introduce no undeclared field,
+    and finally the case's own expected/required/forbidden argument
+    assertions.
+    """
+    if tool_name != case.expected_tool:
+        return False, f"called {tool_name!r}, expected {case.expected_tool!r}"
+
+    try:
+        args = json.loads(raw_arguments) if raw_arguments else {}
+    except json.JSONDecodeError as exc:
+        return False, f"arguments are not valid JSON: {exc}"
+    if not isinstance(args, dict):
+        return False, f"arguments are not a JSON object: {type(args).__name__}"
+
+    schema: dict[str, Any] = {}
+    for tool in case.tools:
+        fn = tool.get("function")
+        if isinstance(fn, dict) and fn.get("name") == tool_name:
+            params = fn.get("parameters")
+            if isinstance(params, dict):
+                schema = params
+            break
+
+    properties = schema.get("properties", {})
+    if isinstance(properties, dict) and properties:
+        undeclared = sorted(set(args) - set(properties))
+        if undeclared:
+            return False, f"arguments not declared in the tool schema: {undeclared}"
+
+    required = schema.get("required", [])
+    if isinstance(required, list):
+        missing = sorted(k for k in required if k not in args)
+        if missing:
+            return False, f"missing schema-required arguments: {missing}"
+
+    missing_keys = sorted(k for k in case.required_arg_keys if k not in args)
+    if missing_keys:
+        return False, f"missing expected arguments: {missing_keys}"
+
+    present_forbidden = sorted(k for k in case.forbidden_arg_keys if k in args)
+    if present_forbidden:
+        return False, f"forbidden arguments present: {present_forbidden}"
+
+    for key, want in case.expected_args.items():
+        if key not in args:
+            return False, f"expected argument {key!r} is absent"
+        if args[key] != want:
+            return False, f"argument {key!r} is {args[key]!r}, expected {want!r}"
+
+    return True, ""
 
 
 @dataclass
@@ -84,17 +159,26 @@ class EvalRunner:
                     })
 
                     if tc["name"] == case.expected_tool:
+                        ok, reason = validate_tool_call(case, tc["name"], tc["arguments"])
                         duration_ms = int((time.time() - start) * 1000)
+                        # The expected tool was reached, so the case is
+                        # decided here either way: calling it with arguments
+                        # that fail the schema is a failure, not a retry.
                         return EvalResult(
                             case_name=case.name,
                             model_name=model,
-                            success=True,
+                            success=ok,
                             turns=turns,
                             tool_calls=tool_calls_made,
+                            error="" if ok else f"invalid call to {tc['name']}: {reason}",
                             duration_ms=duration_ms
                         )
 
-                    tool_result = tool_executor(tc["name"], json.loads(tc["arguments"]))
+                    try:
+                        parsed_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                    except json.JSONDecodeError:
+                        parsed_args = {}
+                    tool_result = tool_executor(tc["name"], parsed_args)
                     messages.append({
                         "role": "assistant",
                         "content": None,
@@ -136,8 +220,26 @@ class EvalRunner:
                 duration_ms=duration_ms
             )
 
+    def preflight(self, model: str) -> None:
+        """Raise ``EndpointUnavailableError`` if ``model`` cannot be reached.
+
+        Without this, an unreachable endpoint turns every case into a FAIL,
+        which is indistinguishable from a model that answered badly. A blocked
+        model run must be reported as blocked, never as a 0% score.
+        """
+        client = create_model_client(self.backend, model, self.base_url)
+        probe = [{"role": "user", "content": "ping"}]
+        try:
+            client.complete(probe, tools=None, temperature=0.0, max_tokens=1)
+        except Exception as exc:
+            raise EndpointUnavailableError(
+                f"model {model!r} is not reachable at {self.base_url!r} "
+                f"via the {self.backend.value} backend: {exc}"
+            ) from exc
+
     def run_evals(self, cases: list[EvalCase], models: list[str],
-                  tool_executor: Callable[[str, dict[str, Any]], str]) -> EvalReport:
+                  tool_executor: Callable[[str, dict[str, Any]], str],
+                  preflight: bool = True) -> EvalReport:
         report = EvalReport(
             timestamp=datetime.now().isoformat(),
             models=models
@@ -145,6 +247,8 @@ class EvalRunner:
 
         for model in models:
             print(f"\n=== Testing model: {model} ===")
+            if preflight:
+                self.preflight(model)
             for case in cases:
                 print(f"  Running: {case.name}...", end=" ")
                 result = self.run_case(case, model, tool_executor)
