@@ -17,6 +17,7 @@ import {
   ResponseValidator,
   StepEnforcer,
 } from "../src/middleware/index.js";
+import { Format } from "../src/reasoning/index.js";
 
 const USAGE: TokenUsage = {
   prompt_tokens: 10,
@@ -351,6 +352,134 @@ describe("AgentLoop", () => {
       (m) => m.meta?.type === "retry_nudge"
     );
     expect(nudge!.content).toContain("ghost_tool");
+  });
+});
+
+describe("AgentLoop reasoning parity (AR-1)", () => {
+  it("builds a native-format tree from reasoning_content and keeps it out of the reply", async () => {
+    const backend = scriptedBackend([
+      {
+        ...textResponse('{"tool": "ok_tool", "args": {}}'),
+        reasoning: "observation: the index is fresh\n\ndecision: call ok_tool",
+      },
+      textResponse("done"),
+    ]);
+    const registry = makeRegistry();
+    const loop = new AgentLoop({
+      backend,
+      registry,
+      validator: new ResponseValidator(registry.names(), true),
+    });
+
+    const result = await loop.run("sys", "do it");
+
+    expect(result.termination_reason).toBe(AgentTerminationReason.COMPLETE);
+    expect(result.tool_calls_made).toBe(1);
+    expect(result.reasoning_tree).not.toBeNull();
+    expect(result.reasoning_tree!.format).toBe(Format.NATIVE);
+    expect(result.reasoning_tree!.nodes).toHaveLength(2);
+    expect(result.final_response).toBe("done");
+  });
+
+  it("strips tagged reasoning before validation and attaches a thinking tree", async () => {
+    const backend = scriptedBackend([
+      textResponse(
+        "<thinking>goal: answer\n\nobservation: the index is fresh</thinking>\n" +
+          '{"tool": "ok_tool", "args": {}}'
+      ),
+      textResponse("done"),
+    ]);
+    const registry = makeRegistry();
+    const loop = new AgentLoop({
+      backend,
+      registry,
+      validator: new ResponseValidator(registry.names(), true),
+    });
+
+    const result = await loop.run("sys", "do it");
+
+    expect(result.termination_reason).toBe(AgentTerminationReason.COMPLETE);
+    expect(result.tool_calls_made).toBe(1);
+    expect(result.reasoning_tree).not.toBeNull();
+    expect(result.reasoning_tree!.format).toBe(Format.THINKING);
+    expect(result.reasoning_tree!.nodes).toHaveLength(2);
+  });
+
+  it("never exposes raw reasoning in the reply, conversation, or tree", async () => {
+    const raw = "observation: secret chain of thought\n\ndecision: call ok_tool";
+    const backend = scriptedBackend([
+      {
+        ...textResponse('{"tool": "ok_tool", "args": {}}'),
+        reasoning: raw,
+      },
+      textResponse("done"),
+    ]);
+    const registry = makeRegistry();
+    const loop = new AgentLoop({
+      backend,
+      registry,
+      validator: new ResponseValidator(registry.names(), true),
+    });
+
+    const result = await loop.run("sys", "do it");
+
+    expect(result.final_response).not.toContain("secret chain of thought");
+    for (const message of result.conversation) {
+      expect(message.content).not.toContain("secret chain of thought");
+    }
+    for (const node of result.reasoning_tree!.nodes) {
+      expect(Array.from(node.summary).length).toBeLessThanOrEqual(512);
+      expect(node.summary).not.toBe(raw);
+    }
+  });
+
+  it("fails closed on malformed reasoning instead of a partial parse", async () => {
+    const backend = scriptedBackend([
+      textResponse('<thinking>never closed\n{"tool": "ok_tool", "args": {}}'),
+    ]);
+    const registry = makeRegistry();
+    const loop = new AgentLoop({
+      backend,
+      registry,
+      validator: new ResponseValidator(registry.names(), true),
+      max_nudges: 2,
+    });
+
+    const result = await loop.run("sys", "do it");
+
+    expect(result.termination_reason).toBe(
+      AgentTerminationReason.NUDGES_EXHAUSTED
+    );
+    expect(result.tool_calls_made).toBe(0);
+    expect(result.nudges).toBe(2);
+    expect(result.reasoning_tree).toBeNull();
+    for (const message of result.conversation) {
+      expect(message.content).not.toContain("never closed");
+    }
+  });
+
+  it("places the system prompt ahead of caller-supplied history", async () => {
+    const backend = scriptedBackend([textResponse("done")]);
+    const registry = makeRegistry();
+    const loop = new AgentLoop({
+      backend,
+      registry,
+      validator: new ResponseValidator(registry.names(), false),
+    });
+    const history: Message[] = [
+      { role: Role.USER, content: "h1" },
+      { role: Role.ASSISTANT, content: "h2" },
+    ];
+
+    await loop.run("sys", "do it", history);
+
+    const sent = backend.calls[0];
+    expect(sent[0].role).toBe(Role.SYSTEM);
+    expect(sent[0].content).toBe("sys");
+    expect(sent[1].content).toBe("h1");
+    expect(sent[2].content).toBe("h2");
+    expect(sent[3].role).toBe(Role.USER);
+    expect(sent[3].content).toBe("do it");
   });
 });
 
