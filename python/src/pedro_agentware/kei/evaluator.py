@@ -10,6 +10,8 @@ so it is testable with no proxy binary present. Agentware deliberately does not
 import any harness package -- a library must not depend on its consumer.
 """
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -96,8 +98,25 @@ class AuthorizationClient(Protocol):
     async plumbing.
     """
 
-    def authorize(self, user_id: str, tool: str, action: str, resource: str) -> Any:
-        """Authorize ``tool`` against ``resource`` for ``user_id``."""
+    def authorize(
+        self,
+        user_id: str,
+        tool: str,
+        action: str,
+        resource: str,
+        *,
+        span_id: str = "",
+        invoking_subject: str = "",
+        parent_span: str = "",
+        delegation_depth: int = 0,
+        agent_id: str = "",
+        agent_version: str = "",
+        framework: str = "",
+        tool_args_digest: str = "",
+        resources: list[str] | None = None,
+        workspace_id: str = "",
+    ) -> Any:
+        """Authorize a tool request with its canonical audit context."""
         ...
 
 
@@ -142,6 +161,12 @@ def resources_touched(tool_name: str, args: dict[str, Any]) -> list[str]:
     add("file", args.get("path") or args.get("file_path"))
 
     return touched
+
+
+def tool_args_digest(args: dict[str, Any]) -> str:
+    """Return a deterministic SHA-256 digest without storing raw arguments."""
+    encoded = json.dumps(args, sort_keys=True, separators=(",", ":"), default=str).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 class KeiProxyEvaluator:
@@ -203,6 +228,16 @@ class KeiProxyEvaluator:
                 tool=tool_name,
                 action=action,
                 resource=resource,
+                span_id=caller.span_id,
+                invoking_subject=user_id,
+                parent_span=caller.parent_span,
+                delegation_depth=caller.delegation_depth,
+                agent_id=caller.agent_id or caller.metadata.get("agent_id", ""),
+                agent_version=caller.agent_version or caller.metadata.get("agent_version", ""),
+                framework=caller.framework or caller.source,
+                tool_args_digest=tool_args_digest(args),
+                resources=resources,
+                workspace_id=caller.workspace_id or caller.metadata.get("workspace_id", ""),
             )
         except Exception as exc:
             # Unreachable proxy, timeout, transport error: fail closed. An

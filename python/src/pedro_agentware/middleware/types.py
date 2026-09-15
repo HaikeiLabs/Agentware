@@ -63,6 +63,11 @@ class CallerContext:
     invoking_subject: str = ""
     parent_span: str = ""
     delegation_depth: int = 0
+    span_id: str = ""
+    agent_id: str = ""
+    agent_version: str = ""
+    framework: str = ""
+    workspace_id: str = ""
 
     def delegate(self, span: str = "", **overrides: Any) -> "CallerContext":
         """Return the context a subagent spawned by this caller should run under.
@@ -79,8 +84,9 @@ class CallerContext:
         overrides["metadata"] = dict(overrides["metadata"])
         return replace(
             self,
-            parent_span=span or self.parent_span,
+            parent_span=span or self.span_id or self.parent_span,
             delegation_depth=self.delegation_depth + 1,
+            span_id="",
             **overrides,
         )
 

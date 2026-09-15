@@ -54,6 +54,7 @@ from .evaluator import (
     AuthorizationResponse,
     KeiProxyEvaluator,
     resources_touched,
+    tool_args_digest,
 )
 from .proxy import (
     LocalProxyProcess,
@@ -73,6 +74,7 @@ __all__ = [
     "AuthorizationResponse",
     "KeiProxyEvaluator",
     "resources_touched",
+    "tool_args_digest",
     "AuthProvider",
     "AuthProviderFactory",
     "BOOTSTRAP_TOKEN_ENV",
