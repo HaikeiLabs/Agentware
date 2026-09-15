@@ -117,10 +117,24 @@ tool call) pass through unchanged.
   `llm/response.ts` adds `reasoning`; `llm/openai_backend.ts` captures
   `reasoning_content`; `middleware/inference.ts` strips before validation and
   attaches `reasoningTree`.
+- **TypeScript agent loop** — `typescript/src/executor/agent_loop.ts`
+  (`AgentLoop`) applies the same contract at the agent-loop surface: it strips
+  native/tagged reasoning before validation, fails closed on malformed or
+  unbounded reasoning (the turn is retried as invalid, never partially parsed),
+  and attaches the last non-empty bounded tree to
+  `AgentResult.reasoning_tree` (null when no turn carried reasoning). Go and Python expose the same capability on
+  their inference loops (`InferenceResult.ReasoningTree` /
+  `InferenceResult.reasoning_tree`); their formatter-based executors do not
+  run the guardrails validator and are out of scope for AR-1.
 
-All three inference loops accept an optional adapter override
-(`cfg.Reasoning` / `cfg.reasoning`) so callers can tune limits and register
-model-specific fields.
+All three inference loops and the TypeScript `AgentLoop` accept an optional
+adapter override (`cfg.Reasoning` / `cfg.reasoning`) so callers can tune
+limits and register model-specific fields.
+
+The agent-loop surfaces also share a conversation contract: the system prompt
+**leads** the conversation, ahead of any caller-supplied history, then the user
+message (`[system, ...history, user]` — Go `buildConversation` is the
+reference; pinned by tests in all three ports).
 
 ## Model-format matrix and blockers
 

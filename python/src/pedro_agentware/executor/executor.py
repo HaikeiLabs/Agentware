@@ -71,8 +71,10 @@ class InferenceExecutor:
 
     def execute(self, req: ExecuteRequest) -> ExecuteResult:
         """Run the inference loop."""
-        conversation = list(req.history)
-        conversation.append(Message(role=Role.SYSTEM, content=req.system_prompt))
+        # Cross-language contract: the system prompt leads the conversation,
+        # ahead of any caller-supplied history (mirrors Go buildConversation).
+        conversation = [Message(role=Role.SYSTEM, content=req.system_prompt)]
+        conversation.extend(req.history)
         conversation.append(Message(role=Role.USER, content=req.user_message))
 
         iterations = 0
