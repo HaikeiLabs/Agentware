@@ -1,4 +1,4 @@
-.PHONY: help evals evals-file-search evals-general evals-clean
+.PHONY: help evals evals-file-search evals-general evals-beta-tools evals-clean
 .PHONY: python-lint python-typecheck python-test python-format
 .PHONY: go-build go-test go-lint go-fmt go-vet
 
@@ -17,6 +17,7 @@ help:
 	@echo "  evals              - Run all evals (file search + general) sequentially against models"
 	@echo "  evals-file-search  - Run only file search tool call evals"
 	@echo "  evals-general      - Run only general tool calling evals"
+	@echo "  evals-beta-tools   - Run only beta tool surface evals (python/src/evals)"
 	@echo "  evals-clean        - Clean eval output files"
 	@echo ""
 	@echo "Environment variables / args:"
@@ -61,6 +62,19 @@ evals-file-search:
 evals-general:
 	python3 -m testing.evals.main --general --models nemotron-3-super-120b
 
+# Beta tool surface evals run against the maintained framework in
+# python/src/evals (ruff + mypy clean), not the older testing/evals port.
+# Authorization and tenancy are NOT evaluated here -- they are deterministic
+# tests: cd python && pytest tests/beta_tool_authorization_test.py
+# EVAL_BASE_URL / EVAL_MODELS / EVAL_BACKEND select the endpoint and model.
+# An unreachable endpoint exits 2 with a BLOCKED message rather than
+# recording a 0% score.
+EVAL_BACKEND ?= llamacpp
+evals-beta-tools:
+	cd python && PYTHONPATH=src python3 -m evals.main --beta-tools \
+		--backend $(EVAL_BACKEND)
+
 evals-clean:
 	rm -rf testing/evals/output/*.json
+	rm -rf python/src/evals/output/*.json
 	@echo "Cleaned eval output files"

@@ -24,11 +24,74 @@ cd typescript && node dist/evals/main.js
 | `--general` | Run general tool calling evals | - |
 | `--github` | Run GitHub tool evals | - |
 | `--calendar` | Run calendar tool evals | - |
+| `--beta-tools` | Run beta tool surface evals | - |
 | `--all` | Run all evals (default) | true |
-| `--models` | Comma-separated model list | qwen3.6-27b-mtp |
-| `--base-url` | API base URL | http://pedrogpt:8000 |
+| `--models` | Comma-separated model list | `$EVAL_MODELS` |
+| `--base-url` | API base URL | `$EVAL_BASE_URL` |
 | `--backend` | Model backend (Python only) | llamacpp |
 | `--max-turns` | Max turns per eval | 10 |
+
+## Beta tool surface evals
+
+`--beta-tools` runs the model-driven cases in
+`python/src/evals/cases/beta_tools.py` over the governed connector reads,
+write action tools, and local capabilities.
+
+```bash
+EVAL_BASE_URL=<endpoint> EVAL_MODELS=<model-id> make evals-beta-tools
+# or, choosing a backend explicitly:
+EVAL_BASE_URL=<endpoint> EVAL_MODELS=<model-id> EVAL_BACKEND=llamacpp \
+  make evals-beta-tools
+```
+
+Use a model id the endpoint actually serves — query `GET /v1/models` (or the
+backend's equivalent) rather than assuming the defaults in this repo are
+available.
+
+### What a case asserts
+
+Beyond the tool *name*, a case may assert arguments:
+
+| Field | Meaning |
+|---|---|
+| `expected_args` | argument must be present with exactly this value |
+| `required_arg_keys` | argument must be present, any value |
+| `forbidden_arg_keys` | argument must **not** appear |
+
+The runner additionally checks that arguments parse as a JSON object matching
+the called tool's declared schema: every `required` property present, and no
+property the schema does not declare. Reaching the expected tool with
+arguments that fail any of these is a **failure**, recorded with the reason.
+
+`forbidden_arg_keys` carries the tenancy property. Scoping the tenant-side
+proxy supplies (`tenant_id`, `workspace`, `repository`, `bucket`, `drive_id`)
+is absent from every connector-read schema, so a model that emits one has
+tried to choose its own scope. See `docs/tenant-proxy-reference.md`.
+
+These evals measure **model behaviour only**. Whether a call is permitted is
+enforced by the middleware policy layer and pinned by deterministic tests:
+
+```bash
+cd python && pytest tests/beta_tool_authorization_test.py
+```
+
+### Blocked runs
+
+If the endpoint is unreachable, the runner raises `EndpointUnavailableError`
+during preflight and `evals.main` exits **2** with a `BLOCKED:` message. A
+blocked run is never written out as a 0% score, which would be
+indistinguishable from a model that failed every case. Report it as blocked.
+
+### Where results live
+
+This repository owns the **runner**, not run results. Do not commit scored
+runs, per-case tool-call tables, or model-specific numbers here; eval output
+under `python/src/evals/output/` is gitignored for that reason.
+
+The exact beta tool inventory and its recorded results are owned by
+**Kei-Chat-Harness**. Attach a run — model id, endpoint/backend, timestamp,
+per-case pass/fail with the tool call and arguments — to the harness PR as
+review evidence, and keep it maintained there.
 
 ## Model Backends
 

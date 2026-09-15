@@ -11,6 +11,7 @@ __pycache__/
 *.pyo
 **/__pycache__/
 testing/evals/output/
+python/src/evals/output/
 .opencode/
 go/pedro-proxy
 go/example
