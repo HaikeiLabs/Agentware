@@ -78,6 +78,32 @@ func TestExecuteResult(t *testing.T) {
 	}
 }
 
+func TestBuildConversation_SystemLeadsHistory(t *testing.T) {
+	req := ExecuteRequest{
+		SystemPrompt: "sys",
+		UserMessage:  "user",
+		History: []llm.Message{
+			{Role: llm.RoleUser, Content: "h1"},
+			{Role: llm.RoleAssistant, Content: "h2"},
+		},
+	}
+
+	conversation := buildConversation(req)
+
+	if len(conversation) != 4 {
+		t.Fatalf("expected 4 messages, got %d", len(conversation))
+	}
+	if conversation[0].Role != llm.RoleSystem || conversation[0].Content != "sys" {
+		t.Errorf("expected leading system message, got %s/%q", conversation[0].Role, conversation[0].Content)
+	}
+	if conversation[1].Content != "h1" || conversation[2].Content != "h2" {
+		t.Errorf("expected history after the system message, got %q, %q", conversation[1].Content, conversation[2].Content)
+	}
+	if conversation[3].Role != llm.RoleUser || conversation[3].Content != "user" {
+		t.Errorf("expected trailing user message, got %s/%q", conversation[3].Role, conversation[3].Content)
+	}
+}
+
 func TestInferenceExecutorConfig(t *testing.T) {
 	cfg := InferenceExecutorConfig{
 		MaxIterations:    15,

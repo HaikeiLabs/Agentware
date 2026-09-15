@@ -55,8 +55,12 @@ export class InferenceExecutor implements Executor {
   }
 
   execute(req: ExecuteRequest): ExecuteResult {
-    const conversation: Message[] = [...req.history];
-    conversation.push({ role: Role.SYSTEM, content: req.system_prompt });
+    // Cross-language contract: the system prompt leads the conversation,
+    // ahead of any caller-supplied history (mirrors Go buildConversation).
+    const conversation: Message[] = [
+      { role: Role.SYSTEM, content: req.system_prompt },
+      ...req.history,
+    ];
     conversation.push({ role: Role.USER, content: req.user_message });
 
     let iterations = 0;

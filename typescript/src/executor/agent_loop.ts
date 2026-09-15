@@ -18,6 +18,12 @@ import {
   stepNudge,
 } from "../middleware/guardrails/nudge.js";
 import { MessageType } from "../middleware/types.js";
+import {
+  ReasoningAdapter,
+  ReasoningError,
+  isContextTreeEmpty,
+  type ContextTree,
+} from "../reasoning/index.js";
 
 export enum AgentTerminationReason {
   COMPLETE = "complete",
@@ -35,6 +41,9 @@ export interface AgentLoopConfig {
   max_iterations?: number;
   max_nudges?: number;
   require_tool_call?: boolean;
+  /** Optional reasoning adapter override for limits and registered model
+   * fields. */
+  reasoning?: ReasoningAdapter;
 }
 
 export interface AgentResult {
@@ -44,7 +53,15 @@ export interface AgentResult {
   nudges: number;
   termination_reason: AgentTerminationReason;
   conversation: Message[];
+  /** Normalized context tree for the last turn that carried reasoning
+   * (native reasoning_content and/or thinking tags). Null when no turn
+   * carried reasoning. Holds bounded summaries only; raw reasoning is never
+   * attached. */
+  reasoning_tree: ContextTree | null;
 }
+
+// Default adapter strips and normalizes reasoning in the agent loop.
+const defaultAdapter = new ReasoningAdapter();
 
 export function registryToolDefinitions(
   registry: ToolRegistry
@@ -123,8 +140,12 @@ export class AgentLoop {
     history: Message[] = [],
     session_id: string = ""
   ): Promise<AgentResult> {
-    const conversation: Message[] = [...history];
-    conversation.push({ role: Role.SYSTEM, content: system_prompt });
+    // Cross-language contract: the system prompt leads the conversation,
+    // ahead of any caller-supplied history (mirrors Go buildConversation).
+    const conversation: Message[] = [
+      { role: Role.SYSTEM, content: system_prompt },
+      ...history,
+    ];
     conversation.push({ role: Role.USER, content: user_message });
 
     const toolDefs = registryToolDefinitions(this.config.registry);
@@ -133,6 +154,7 @@ export class AgentLoop {
     let toolCallsMade = 0;
     let nudges = 0;
     let finalResponse = "";
+    let reasoningTree: ContextTree | null = null;
 
     while (iterations < this.maxIterations) {
       iterations++;
@@ -154,27 +176,72 @@ export class AgentLoop {
           toolCallsMade,
           nudges,
           AgentTerminationReason.ERROR,
-          conversation
+          conversation,
+          reasoningTree
         );
       }
 
-      const validation = this.validate(resp);
+      // AR-1 parity: normalize reasoning and strip it before validation.
+      // Reasoning can arrive as a native reasoning_content field or as
+      // embedded thinking tags in content; both are combined into a synthetic
+      // structured input so the adapter sees the full picture. Malformed or
+      // unbounded reasoning fails closed: this turn is treated as invalid and
+      // retried rather than parsed partially.
+      let turnTree: ContextTree | null = null;
+      let cleanContent = resp.content;
+      let reasoningFailed = false;
+      if (resp.content || resp.reasoning) {
+        const reasoningInput: Record<string, unknown> = {
+          content: resp.content,
+        };
+        if (resp.reasoning) {
+          reasoningInput["reasoning_content"] = resp.reasoning;
+        }
+        const adapter = this.config.reasoning ?? defaultAdapter;
+        try {
+          turnTree = adapter.extract(
+            reasoningInput,
+            this.config.backend.modelName(),
+            "agent-loop"
+          );
+          cleanContent = adapter.strip(reasoningInput);
+        } catch (e) {
+          if (e instanceof ReasoningError) {
+            reasoningFailed = true;
+            // Fail closed: never echo content that may carry reasoning we
+            // could not parse.
+            cleanContent = "";
+          } else {
+            throw e;
+          }
+        }
+      }
+      // Keep the last turn that actually carried reasoning; a later plain
+      // turn must not blank out the tree the consumer is after.
+      if (!isContextTreeEmpty(turnTree)) {
+        reasoningTree = turnTree;
+      }
+
+      const validation: ValidationResult = reasoningFailed
+        ? { toolCalls: [], nudge: null, needsRetry: true }
+        : this.validate(resp, cleanContent);
 
       if (validation.needsRetry) {
         if (nudges >= this.maxNudges) {
           return this.finish(
-            resp.content,
+            cleanContent,
             iterations,
             toolCallsMade,
             nudges,
             AgentTerminationReason.NUDGES_EXHAUSTED,
-            conversation
+            conversation,
+            reasoningTree
           );
         }
         nudges++;
         conversation.push({
           role: Role.ASSISTANT,
-          content: resp.content,
+          content: cleanContent,
           meta: { type: MessageType.TEXT_RESPONSE },
         });
         if (validation.nudge) {
@@ -188,14 +255,15 @@ export class AgentLoop {
       }
 
       if (validation.toolCalls.length === 0) {
-        finalResponse = resp.content;
+        finalResponse = cleanContent;
         return this.finish(
           finalResponse,
           iterations,
           toolCallsMade,
           nudges,
           AgentTerminationReason.COMPLETE,
-          conversation
+          conversation,
+          reasoningTree
         );
       }
 
@@ -210,12 +278,13 @@ export class AgentLoop {
           if (!allowed) {
             if (nudges >= this.maxNudges) {
               return this.finish(
-                resp.content,
+                cleanContent,
                 iterations,
                 toolCallsMade,
                 nudges,
                 AgentTerminationReason.NUDGES_EXHAUSTED,
-                conversation
+                conversation,
+                reasoningTree
               );
             }
             nudges++;
@@ -300,18 +369,19 @@ export class AgentLoop {
       toolCallsMade,
       nudges,
       AgentTerminationReason.MAX_ITERATIONS,
-      conversation
+      conversation,
+      reasoningTree
     );
   }
 
-  private validate(resp: Response): ValidationResult {
+  private validate(resp: Response, cleanContent: string): ValidationResult {
     if (resp.tool_calls.length > 0) {
       return this.config.validator.validateToolCalls(
         resp.tool_calls.map((tc) => ({ tool: tc.name, args: tc.arguments }))
       );
     }
     const textValidation =
-      this.config.validator.validateTextResponse(resp.content);
+      this.config.validator.validateTextResponse(cleanContent);
     if (textValidation.toolCalls.length > 0) {
       return textValidation;
     }
@@ -327,7 +397,8 @@ export class AgentLoop {
     toolCallsMade: number,
     nudges: number,
     termination: AgentTerminationReason,
-    conversation: Message[]
+    conversation: Message[],
+    reasoningTree: ContextTree | null
   ): AgentResult {
     return {
       final_response: finalResponse,
@@ -336,6 +407,7 @@ export class AgentLoop {
       nudges,
       termination_reason: termination,
       conversation,
+      reasoning_tree: reasoningTree,
     };
   }
 }
