@@ -119,6 +119,9 @@ client = AuditedToolClient(
     evaluator=policy_evaluator,  # Your PolicyEvaluator
     auditor=auditor,             # Optional: your Auditor
 )
+
+# Or let the contract wire its executor, policy, and auditor together:
+client = contract.create_tool_client(source="my-harness")
 ```
 
 ### Audit Logging
@@ -211,7 +214,7 @@ These have library defaults:
 
 | Component | Default | Description |
 |-----------|---------|-------------|
-| `policy_evaluator` | `None` (allow all) | Enforces policy on tool calls |
+| `policy_evaluator` | Explicit deny-all evaluator | Enforces policy on tool calls |
 | `auditor` | `InMemoryAuditor` | Records all tool call decisions |
 | `proxy_process` | `None` | Manages local KEI proxy |
 

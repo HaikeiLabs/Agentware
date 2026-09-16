@@ -10,6 +10,9 @@ missing credentials, and expired tokens all result in DENY.
 
 from typing import Any, Protocol, runtime_checkable
 
+from pedro_agentware.middleware import AuditedToolClient
+from pedro_agentware.middleware.policy import Policy, SimplePolicyEvaluator
+
 from .auth import SecretProvider
 from .proxy import ProxyProcess
 
@@ -64,7 +67,8 @@ class HarnessContract:
     - secret_provider: SecretProvider - sources the bootstrap secret
 
     OPTIONAL (library provides sensible defaults):
-    - policy_evaluator: PolicyEvaluator | None - enforces policy on tool calls
+    - policy_evaluator: PolicyEvaluator | None - enforces policy on tool calls;
+      omitted means deny all (fail closed)
     - auditor: Auditor | None - records all tool call decisions
     - proxy_process: ProxyProcess | None - manages local KEI proxy
 
@@ -100,16 +104,25 @@ class HarnessContract:
             auth_provider: Authentication provider for KEI API (AuthProvider protocol)
             tool_executor: Tool execution backend (ToolExecutor protocol)
             secret_provider: Secret source for bootstrap token (SecretProvider protocol)
-            policy_evaluator: Optional policy evaluator (default: allow all)
+            policy_evaluator: Optional policy evaluator (default: deny all)
             auditor: Optional audit logger (default: in-memory)
             proxy_process: Optional proxy process manager
         """
         self.auth_provider = auth_provider
         self.tool_executor = tool_executor
         self.secret_provider = secret_provider
-        self.policy_evaluator = policy_evaluator
+        self.policy_evaluator = policy_evaluator or SimplePolicyEvaluator(Policy(default_deny=True))
         self.auditor = auditor
         self.proxy_process = proxy_process
+
+    def create_tool_client(self, source: str = "pedro-agentware") -> AuditedToolClient:
+        """Create an audited client wired to this contract's components."""
+        return AuditedToolClient(
+            source=source,
+            evaluator=self.policy_evaluator,
+            auditor=self.auditor,
+            executor=self.tool_executor.execute,
+        )
 
 
 def validate_contract(contract: HarnessContract) -> list[str]:

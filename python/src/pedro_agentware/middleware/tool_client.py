@@ -34,11 +34,13 @@ class AuditedToolClient:
         source: str = "pedro-agentware",
         evaluator: PolicyEvaluator | None = None,
         auditor: Auditor | None = None,
+        executor: Callable[[str, dict[str, Any]], Any] | None = None,
     ) -> None:
         self.middleware_url = middleware_url
         self.source = source
         self.auditor: Auditor = auditor if auditor is not None else InMemoryAuditor()
         self._evaluator = evaluator
+        self._executor = executor
 
     def with_policy(self, evaluator: PolicyEvaluator) -> "AuditedToolClient":
         """Set the policy evaluator consulted before each execution."""
@@ -64,7 +66,7 @@ class AuditedToolClient:
         user_id: str,
         channel_id: str,
         guild_id: str | None,
-        func: Callable[..., Any],
+        func: Callable[..., Any] | None = None,
         caller: CallerContext | None = None,
     ) -> Any:
         """Authorize ``tool_name``, run ``func`` when allowed, and audit either way.
@@ -72,6 +74,16 @@ class AuditedToolClient:
         ``caller`` carries the delegation chain. When omitted, one is built from
         ``user_id`` -- which at a human entry point is the invoking subject.
         """
+        if func is None:
+            if self._executor is None:
+                raise TypeError("func is required when no executor is configured")
+            executor = self._executor
+
+            def execute_from_contract(**args: Any) -> Any:
+                return executor(tool_name, args)
+
+            func = execute_from_contract
+
         if caller is None:
             caller = CallerContext(
                 user_id=user_id,
