@@ -74,6 +74,80 @@ class TestThirdPartyHarness:
         errors = validate_contract(contract)
         assert errors == [], f"Contract validation failed: {errors}"
 
+    @pytest.mark.asyncio
+    async def test_contract_client_defaults_to_deny_and_uses_executor(self):
+        """The contract wires its executor and fails closed without policy."""
+        from pedro_agentware.kei import (
+            EnvSecretProvider,
+            HarnessContract,
+            OpaqueTokenProvider,
+        )
+        from pedro_agentware.middleware import Action, CallerContext
+
+        calls = []
+
+        class Executor:
+            def execute(self, tool_name: str, args: dict) -> dict:
+                calls.append((tool_name, args))
+                return {"ok": True}
+
+        contract = HarnessContract(
+            auth_provider=OpaqueTokenProvider(token="test-token"),
+            tool_executor=Executor(),
+            secret_provider=EnvSecretProvider(),
+        )
+        client = contract.create_tool_client(source="contract-test")
+
+        with pytest.raises(PermissionError):
+            await client.Execute(
+                "write",
+                {},
+                "user",
+                "session",
+                None,
+                caller=CallerContext(user_id="user", invoking_subject="user"),
+            )
+
+        assert calls == []
+        assert client.records()[0].decision.action == Action.DENY
+
+    @pytest.mark.asyncio
+    async def test_contract_client_wires_explicit_policy_and_auditor(self):
+        """Explicit evaluator, auditor, and executor are used by the client."""
+        from pedro_agentware.kei import (
+            EnvSecretProvider,
+            HarnessContract,
+            OpaqueTokenProvider,
+        )
+        from pedro_agentware.middleware import AuditFilter, CallerContext, InMemoryAuditor
+        from pedro_agentware.middleware.policy import Policy, SimplePolicyEvaluator
+
+        class Executor:
+            def execute(self, tool_name: str, args: dict) -> dict:
+                return {"tool": tool_name, **args}
+
+        auditor = InMemoryAuditor()
+        contract = HarnessContract(
+            auth_provider=OpaqueTokenProvider(token="test-token"),
+            tool_executor=Executor(),
+            secret_provider=EnvSecretProvider(),
+            policy_evaluator=SimplePolicyEvaluator(Policy(default_deny=False)),
+            auditor=auditor,
+        )
+        client = contract.create_tool_client(source="contract-test")
+        result = await client.Execute(
+            "echo",
+            {"value": 1},
+            "user",
+            "session",
+            None,
+            caller=CallerContext(user_id="user", invoking_subject="user"),
+        )
+
+        assert result == {"tool": "echo", "value": 1}
+        assert len(auditor.query(AuditFilter())) == 1
+        assert client.records() == auditor.query(AuditFilter())
+
     def test_harness_with_auditor(self):
         """Build a harness with audit logging."""
         from pedro_agentware.kei import (
