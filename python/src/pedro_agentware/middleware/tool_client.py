@@ -9,7 +9,9 @@ and an Auditor themselves.
 
 import inspect
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
+from uuid import uuid4
 
 from .audit import AuditFilter, Auditor, AuditRecord, InMemoryAuditor
 from .policy import PolicyEvaluator
@@ -92,6 +94,12 @@ class AuditedToolClient:
                 invoking_subject=user_id,
                 metadata={"channel_id": channel_id, "guild_id": guild_id or ""},
             )
+
+        # The span identifies this exact tool authorization/execution pair.
+        # Keep it on the per-call context so delegated children can use it as
+        # their parent span without mutating a caller context shared by peers.
+        if not caller.span_id:
+            caller = replace(caller, span_id=str(uuid4()))
 
         if self._evaluator is not None:
             decision = self._evaluator.evaluate(tool_name, tool_args, caller)
