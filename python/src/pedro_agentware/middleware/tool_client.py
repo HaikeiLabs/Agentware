@@ -8,10 +8,10 @@ and an Auditor themselves.
 """
 
 import inspect
-from dataclasses import replace
-from uuid import uuid4
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
+from uuid import uuid4
 
 from .audit import AuditFilter, Auditor, AuditRecord, InMemoryAuditor
 from .policy import PolicyEvaluator
