@@ -2,11 +2,20 @@
 
 __version__ = "0.1.0"
 
-from .executor import Executor
+from .executor import AgentLoop, AgentLoopConfig, AgentResult, AgentTerminationReason, Executor
 from .jobs import Job, JobManager
 from .llm import Backend, Message
 from .llmcontext import ContextManager
-from .middleware import Auditor, Middleware, PolicyEvaluator
+from .middleware import (
+    Auditor,
+    EventKind,
+    LoggingObserver,
+    LoopEvent,
+    LoopObserver,
+    Middleware,
+    PolicyEvaluator,
+    RecordingObserver,
+)
 from .prompts import PromptGenerator
 from .reasoning import ReasoningAdapter
 from .toolformat import ToolFormatter
@@ -20,6 +29,15 @@ __all__ = [
     "PolicyEvaluator",
     "Auditor",
     "Executor",
+    "AgentLoop",
+    "AgentLoopConfig",
+    "AgentResult",
+    "AgentTerminationReason",
+    "EventKind",
+    "LoopEvent",
+    "LoopObserver",
+    "RecordingObserver",
+    "LoggingObserver",
     "Job",
     "JobManager",
     "Message",

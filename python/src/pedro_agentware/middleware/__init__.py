@@ -1,6 +1,15 @@
 """Middleware package - Policy enforcement and auditing."""
 
 from .audit import AuditFilter, Auditor, AuditRecord, InMemoryAuditor
+from .hooks import (
+    EventKind,
+    FunctionObserver,
+    LoggingObserver,
+    LoopEvent,
+    LoopObserver,
+    RecordingObserver,
+    SafeObserver,
+)
 from .middleware import Middleware, MiddlewareImpl
 from .policy import Condition, Operator, Policy, PolicyEvaluator, Rule, SimplePolicyEvaluator
 from .tool_client import AuditedToolClient
@@ -23,4 +32,11 @@ __all__ = [
     "AuditRecord",
     "AuditFilter",
     "InMemoryAuditor",
+    "EventKind",
+    "LoopEvent",
+    "LoopObserver",
+    "RecordingObserver",
+    "LoggingObserver",
+    "FunctionObserver",
+    "SafeObserver",
 ]
