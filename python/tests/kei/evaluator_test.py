@@ -34,6 +34,18 @@ class FakeProxy:
         return self._result
 
 
+class LegacyProxy:
+    """A pre-context client that accepts only the original four arguments."""
+
+    def __init__(self, result):
+        self.result = result
+        self.calls: list[tuple[str, str, str, str]] = []
+
+    def authorize(self, user_id: str, tool: str, action: str, resource: str):
+        self.calls.append((user_id, tool, action, resource))
+        return self.result
+
+
 def evaluate(result=None, raises: Exception | None = None, args: dict | None = None):
     """Run one evaluation against a fake proxy and return (decision, proxy)."""
     proxy = FakeProxy(result=result, raises=raises)
@@ -198,6 +210,20 @@ def test_full_audit_context_is_sent_to_the_proxy():
     assert call["workspace_id"] == "workspace-1"
     assert call["resources"] == ["github:repo:acme/sales-pipeline"]
     assert len(call["tool_args_digest"]) == 64
+
+
+def test_legacy_proxy_receives_the_original_four_arguments():
+    proxy = LegacyProxy({"decision": "permit"})
+    decision = KeiProxyEvaluator(proxy).evaluate(
+        "github.read",
+        {"owner": "acme", "repo": "sales-pipeline"},
+        CallerContext(user_id="U123", invoking_subject="U_HUMAN"),
+    )
+
+    assert decision.action == Action.ALLOW
+    assert proxy.calls == [
+        ("U_HUMAN", "github.read", "execute", "github:repo:acme/sales-pipeline")
+    ]
 
 
 # --- resources_touched ------------------------------------------------------

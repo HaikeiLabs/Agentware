@@ -11,6 +11,7 @@ import any harness package -- a library must not depend on its consumer.
 """
 
 import hashlib
+import inspect
 import json
 import logging
 from dataclasses import dataclass
@@ -223,21 +224,14 @@ class KeiProxyEvaluator:
         user_id = caller.invoking_subject or caller.user_id
 
         try:
-            raw = self._client.authorize(
+            raw = self._authorize(
                 user_id=user_id,
                 tool=tool_name,
                 action=action,
                 resource=resource,
-                span_id=caller.span_id,
-                invoking_subject=user_id,
-                parent_span=caller.parent_span,
-                delegation_depth=caller.delegation_depth,
-                agent_id=caller.agent_id or caller.metadata.get("agent_id", ""),
-                agent_version=caller.agent_version or caller.metadata.get("agent_version", ""),
-                framework=caller.framework or caller.source,
-                tool_args_digest=tool_args_digest(args),
+                caller=caller,
                 resources=resources,
-                workspace_id=caller.workspace_id or caller.metadata.get("workspace_id", ""),
+                args=args,
             )
         except Exception as exc:
             # Unreachable proxy, timeout, transport error: fail closed. An
@@ -282,6 +276,56 @@ class KeiProxyEvaluator:
             reason=reason,
             policy_id=response.policy_id,
         )
+
+    def _authorize(
+        self,
+        *,
+        user_id: str,
+        tool: str,
+        action: str,
+        resource: str,
+        caller: CallerContext,
+        resources: list[str],
+        args: dict[str, Any],
+    ) -> Any:
+        """Call a modern client, with a narrow path for legacy clients.
+
+        Signature binding selects compatibility before making the call. This
+        avoids retrying an authorization request after a client has already
+        run it and raised a ``TypeError`` internally.
+        """
+        base_args = (user_id, tool, action, resource)
+        context: dict[str, Any] = {
+            "span_id": caller.span_id,
+            "invoking_subject": user_id,
+            "parent_span": caller.parent_span,
+            "delegation_depth": caller.delegation_depth,
+            "agent_id": caller.agent_id or caller.metadata.get("agent_id", ""),
+            "agent_version": caller.agent_version or caller.metadata.get("agent_version", ""),
+            "framework": caller.framework or caller.source,
+            "tool_args_digest": tool_args_digest(args),
+            "resources": resources,
+            "workspace_id": caller.workspace_id or caller.metadata.get("workspace_id", ""),
+        }
+        authorize = self._client.authorize
+
+        try:
+            signature = inspect.signature(authorize)
+        except (TypeError, ValueError):
+            # Some extension/builtin callables do not expose a signature. Give
+            # them the modern contract; any exception still fails closed above.
+            return authorize(*base_args, **context)
+
+        try:
+            signature.bind(*base_args, **context)
+        except TypeError as modern_error:
+            try:
+                signature.bind(*base_args)
+            except TypeError:
+                raise modern_error
+            return authorize(*base_args)
+
+        return authorize(*base_args, **context)
 
     def _decision(
         self,
